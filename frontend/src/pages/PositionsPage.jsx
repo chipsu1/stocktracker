@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { usePortfolioStore } from '../store/portfolioStore'
 import AddPositionModal from '../components/ui/AddPositionModal'
+import ConfirmModal from '../components/ui/ConfirmModal'
 import clsx from 'clsx'
 
 function fmt(v, decimals = 2) {
@@ -38,22 +39,13 @@ function PLNChange({ value }) {
 export default function PositionsPage() {
   const { summary, loading, activePortfolioId, portfolios, deletePosition, fetchSummary } = usePortfolioStore()
   const [showAdd, setShowAdd] = useState(false)
+  const [confirm, setConfirm] = useState(null) // { id, name }
   const [deleting, setDeleting] = useState(null)
 
   const portfolio = portfolios.find((p) => p.id === activePortfolioId)
-
-  if (!activePortfolioId) {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-500">
-        Wybierz portfel w panelu bocznym.
-      </div>
-    )
-  }
-
   const positions = summary?.positions || []
 
   async function handleDelete(positionId) {
-    if (!window.confirm('Usunąć tę pozycję?')) return
     setDeleting(positionId)
     try {
       await deletePosition(positionId)
@@ -66,9 +58,16 @@ export default function PositionsPage() {
     if (activePortfolioId) await fetchSummary(activePortfolioId)
   }
 
+  if (!activePortfolioId) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        Wybierz portfel w panelu bocznym.
+      </div>
+    )
+  }
+
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-white">{portfolio?.name} — Pozycje</h1>
@@ -84,7 +83,6 @@ export default function PositionsPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-gray-800">
         <table className="w-full text-sm">
           <thead>
@@ -112,36 +110,23 @@ export default function PositionsPage() {
               </tr>
             )}
             {positions.map((p) => (
-              <tr
-                key={p.id}
-                className="border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors"
-              >
+              <tr key={p.id} className="border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors">
                 <td className="px-4 py-3 font-mono font-medium text-white">{p.ticker}</td>
                 <td className="px-4 py-3 text-gray-300 max-w-[140px] truncate">{p.name || '—'}</td>
                 <td className="px-4 py-3 text-gray-400 text-xs">{p.asset_class}</td>
                 <td className="px-4 py-3 text-right text-gray-400">{p.currency}</td>
                 <td className="px-4 py-3 text-right text-gray-300">{fmtNum(p.quantity, p.quantity % 1 === 0 ? 0 : 2)}</td>
-                <td className="px-4 py-3 text-right text-gray-300">
-                  {fmtNum(p.avg_purchase_price)} {p.currency}
-                </td>
+                <td className="px-4 py-3 text-right text-gray-300">{fmtNum(p.avg_purchase_price)} {p.currency}</td>
                 <td className="px-4 py-3 text-right text-white font-medium">
                   {p.current_price != null ? `${fmtNum(p.current_price)} ${p.currency}` : '—'}
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <Pct value={p.daily_change_pct} />
-                </td>
-                <td className="px-4 py-3 text-right text-white">
-                  {fmt(p.current_value_pln)}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <PLNChange value={p.gain_loss_pln} />
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <Pct value={p.gain_loss_pct} />
-                </td>
+                <td className="px-4 py-3 text-right"><Pct value={p.daily_change_pct} /></td>
+                <td className="px-4 py-3 text-right text-white">{fmt(p.current_value_pln)}</td>
+                <td className="px-4 py-3 text-right"><PLNChange value={p.gain_loss_pln} /></td>
+                <td className="px-4 py-3 text-right"><Pct value={p.gain_loss_pct} /></td>
                 <td className="px-4 py-3 text-right">
                   <button
-                    onClick={() => handleDelete(p.id)}
+                    onClick={() => setConfirm({ id: p.id, name: p.ticker })}
                     disabled={deleting === p.id}
                     className="text-gray-600 hover:text-loss transition-colors text-xs"
                   >
@@ -155,18 +140,10 @@ export default function PositionsPage() {
           {positions.length > 0 && summary && (
             <tfoot>
               <tr className="border-t border-gray-700 bg-gray-900/80">
-                <td colSpan={8} className="px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">
-                  Łącznie
-                </td>
-                <td className="px-4 py-3 text-right text-white font-semibold">
-                  {fmt(summary.total_value_pln)}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <PLNChange value={summary.total_gain_loss_pln} />
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <Pct value={summary.total_gain_loss_pct} />
-                </td>
+                <td colSpan={8} className="px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">Łącznie</td>
+                <td className="px-4 py-3 text-right text-white font-semibold">{fmt(summary.total_value_pln)}</td>
+                <td className="px-4 py-3 text-right"><PLNChange value={summary.total_gain_loss_pln} /></td>
+                <td className="px-4 py-3 text-right"><Pct value={summary.total_gain_loss_pct} /></td>
                 <td />
               </tr>
             </tfoot>
@@ -175,6 +152,14 @@ export default function PositionsPage() {
       </div>
 
       {showAdd && <AddPositionModal onClose={() => setShowAdd(false)} />}
+
+      {confirm && (
+        <ConfirmModal
+          message={`Usunąć pozycję ${confirm.name}?`}
+          onConfirm={() => handleDelete(confirm.id)}
+          onClose={() => setConfirm(null)}
+        />
+      )}
     </div>
   )
 }
