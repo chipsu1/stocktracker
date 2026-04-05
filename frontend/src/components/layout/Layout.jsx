@@ -1,7 +1,8 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { Outlet, NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { usePortfolioStore } from '../../store/portfolioStore'
+import CreatePortfolioModal from '../ui/CreatePortfolioModal'
 import clsx from 'clsx'
 
 const NAV = [
@@ -12,29 +13,21 @@ const NAV = [
 export default function Layout() {
   const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
-  const { portfolios, activePortfolioId, fetchPortfolios, setActivePortfolio, createPortfolio } =
+  const { portfolios, activePortfolioId, fetchPortfolios, setActivePortfolio } =
     usePortfolioStore()
+  const [showCreate, setShowCreate] = useState(false)
 
   useEffect(() => {
     fetchPortfolios()
   }, [])
 
-  async function handleNewPortfolio() {
-    const name = window.prompt('Nazwa nowego portfela:')
-    if (!name) return
-    const p = await createPortfolio({ name })
-    setActivePortfolio(p.id)
-  }
-
   return (
     <div className="flex h-screen bg-gray-950">
-      {/* Sidebar */}
       <aside className="w-56 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col">
         <div className="p-4 border-b border-gray-800">
           <span className="text-white font-semibold text-sm">Portfolio Tracker</span>
         </div>
 
-        {/* Portfele */}
         <div className="p-3 border-b border-gray-800">
           <p className="text-xs text-gray-500 font-medium mb-2 uppercase tracking-wide">Portfele</p>
           <div className="space-y-1">
@@ -54,14 +47,13 @@ export default function Layout() {
             ))}
           </div>
           <button
-            onClick={handleNewPortfolio}
+            onClick={() => setShowCreate(true)}
             className="mt-2 w-full text-xs text-gray-500 hover:text-white py-1 text-left px-3 rounded hover:bg-gray-800 transition-colors"
           >
             + Nowy portfel
           </button>
         </div>
 
-        {/* Nawigacja */}
         <nav className="flex-1 p-3 space-y-1">
           {NAV.map(({ to, label }) => (
             <NavLink
@@ -81,7 +73,6 @@ export default function Layout() {
           ))}
         </nav>
 
-        {/* User */}
         <div className="p-3 border-t border-gray-800">
           <p className="text-xs text-gray-500 truncate mb-1">{user?.email || '—'}</p>
           <button onClick={logout} className="text-xs text-gray-500 hover:text-white transition-colors">
@@ -90,10 +81,11 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
+
+      {showCreate && <CreatePortfolioModal onClose={() => setShowCreate(false)} />}
     </div>
   )
 }
