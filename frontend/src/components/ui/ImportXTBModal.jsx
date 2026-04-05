@@ -2,6 +2,8 @@ import { useState, useRef } from 'react'
 import { usePortfolioStore } from '../../store/portfolioStore'
 import clsx from 'clsx'
 
+const BACKEND_URL = 'https://stocktracker-production-5f5f.up.railway.app'
+
 export default function ImportXTBModal({ onClose }) {
   const { activePortfolioId, fetchSummary } = usePortfolioStore()
   const [file, setFile] = useState(null)
@@ -21,7 +23,7 @@ export default function ImportXTBModal({ onClose }) {
       formData.append('file', file)
 
       const res = await fetch(
-        `/api/import/${activePortfolioId}/xtb?merge=${merge}`,
+        `${BACKEND_URL}/api/import/${activePortfolioId}/xtb?merge=${merge}`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
