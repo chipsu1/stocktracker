@@ -27,6 +27,7 @@ export default function AddPositionModal({ onClose }) {
     quantity: '',
     avg_purchase_price: '',
     exchange_rate_at_purchase: '1',
+    purchase_date: new Date().toISOString().split('T')[0],
   })
 
   function set(key, value) {
@@ -43,6 +44,7 @@ export default function AddPositionModal({ onClose }) {
         quantity: parseFloat(form.quantity),
         avg_purchase_price: parseFloat(form.avg_purchase_price),
         exchange_rate_at_purchase: parseFloat(form.exchange_rate_at_purchase) || 1,
+        purchase_date: form.purchase_date ? new Date(form.purchase_date).toISOString() : null,
       })
       onClose()
     } catch (err) {
@@ -64,7 +66,7 @@ export default function AddPositionModal({ onClose }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Ticker *</label>
-              <input className="input" placeholder="np. NVDA, PKN, ETR:SAP" value={form.ticker}
+              <input className="input" placeholder="np. NVDA, XTB, ETR:SAP" value={form.ticker}
                 onChange={(e) => set('ticker', e.target.value.toUpperCase())} required />
             </div>
             <div>
@@ -98,6 +100,12 @@ export default function AddPositionModal({ onClose }) {
               <input className="input" type="number" step="any" min="0" placeholder="150.00" value={form.avg_purchase_price}
                 onChange={(e) => set('avg_purchase_price', e.target.value)} required />
             </div>
+          </div>
+
+          <div>
+            <label className="label">Data zakupu</label>
+            <input className="input" type="date" value={form.purchase_date}
+              onChange={(e) => set('purchase_date', e.target.value)} />
           </div>
 
           {form.currency !== 'PLN' && (
