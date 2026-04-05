@@ -1,7 +1,3 @@
-"""
-Wklej ten plik jako: backend/app/api/routes/import_xtb.py
-"""
-
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Dict
@@ -11,7 +7,7 @@ import io
 from app.db.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.models.portfolio import Portfolio, Transaction
+from app.models.portfolio import Transaction
 from app.services.portfolio_service import get_portfolio
 
 router = APIRouter(prefix="/import", tags=["import"])
@@ -25,7 +21,6 @@ def _find_header_row(df_raw: pd.DataFrame, keyword: str) -> int:
 
 
 def _parse_open_positions(xl: pd.ExcelFile) -> pd.DataFrame:
-    # Znajdź arkusz z otwartymi pozycjami
     sheet = next((s for s in xl.sheet_names if "OPEN" in s.upper()), None)
     if not sheet:
         return pd.DataFrame()
@@ -35,12 +30,11 @@ def _parse_open_positions(xl: pd.ExcelFile) -> pd.DataFrame:
         return pd.DataFrame()
     df = pd.read_excel(xl, sheet_name=sheet, header=header_row)
     df = df.dropna(subset=["Symbol"])
-    df = df[df["Symbol"].astype(str).str.contains(r"\.", na=False)]  # usuń "Total" itp.
+    df = df[df["Symbol"].astype(str).str.contains(r"\.", na=False)]
     return df
 
 
 def _ticker_for_app(xtb_symbol: str) -> str:
-    """Konwertuje XTB symbol (ELT.PL) na format yfinance (ELT.WA)"""
     if xtb_symbol.upper().endswith(".PL"):
         base = xtb_symbol[:-3]
         return f"{base}.WA"
@@ -48,7 +42,6 @@ def _ticker_for_app(xtb_symbol: str) -> str:
 
 
 def _merge_positions(df: pd.DataFrame) -> List[Dict]:
-    """Grupuje pozycje po tickerze (średnia ważona ceny, suma wolumenu)."""
     grouped = {}
     for _, row in df.iterrows():
         symbol = str(row["Symbol"]).strip()
@@ -79,8 +72,8 @@ def _merge_positions(df: pd.DataFrame) -> List[Dict]:
         result.append({
             "ticker": ticker,
             "quantity": round(data["total_volume"], 6),
-            "avg_purchase_price": round(avg_price, 4),
-            "purchase_date": data["earliest_date"] if pd.notna(data["earliest_date"]) else None,
+            "price": round(avg_price, 4),
+            "date": data["earliest_date"] if pd.notna(data["earliest_date"]) else None,
             "asset_class": "Akcje",
             "currency": "PLN",
         })
@@ -95,12 +88,7 @@ def import_xtb(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Importuje otwarte pozycje z pliku XTB (.xlsx).
-    merge=true → grupuje wiele pozycji tego samego tickera w jedną (średnia ważona)
-    merge=false → importuje każdą linię osobno
-    """
-    get_portfolio(db, portfolio_id, current_user.id)  # sprawdź dostęp
+    get_portfolio(db, portfolio_id, current_user.id)
 
     if not file.filename.endswith(".xlsx"):
         raise HTTPException(400, "Plik musi być w formacie .xlsx")
@@ -116,52 +104,50 @@ def import_xtb(
         raise HTTPException(400, "Brak otwartych pozycji w pliku")
 
     if merge:
-        positions_to_import = _merge_positions(df)
+        items = _merge_positions(df)
     else:
-        positions_to_import = []
+        items = []
         for _, row in df.iterrows():
             ticker = _ticker_for_app(str(row["Symbol"]).strip())
-            positions_to_import.append({
+            open_time = row["Open time"]
+            items.append({
                 "ticker": ticker,
                 "quantity": float(row["Volume"]),
-                "avg_purchase_price": float(row["Open price"]),
-                "purchase_date": row["Open time"] if pd.notna(row["Open time"]) else None,
+                "price": float(row["Open price"]),
+                "date": open_time if pd.notna(open_time) else None,
                 "asset_class": "Akcje",
                 "currency": "PLN",
             })
 
     imported = []
-    skipped = []
 
-    for p in positions_to_import:
-
-
-        purchase_date = p["purchase_date"]
-        if pd.notna(purchase_date) if not isinstance(purchase_date, type(None)) else False:
+    for p in items:
+        tx_date = None
+        if p["date"] is not None:
             try:
-                purchase_date = pd.Timestamp(purchase_date).to_pydatetime()
+                tx_date = pd.Timestamp(p["date"]).to_pydatetime()
             except Exception:
-                purchase_date = None
+                tx_date = None
 
-        position = Position(
+        tx = Transaction(
             portfolio_id=portfolio_id,
+            transaction_type="buy",
             ticker=p["ticker"],
             asset_class=p["asset_class"],
             currency=p["currency"],
             quantity=p["quantity"],
-            avg_purchase_price=p["avg_purchase_price"],
-            avg_purchase_price_pln=p["avg_purchase_price"],  # PLN więc 1:1
-            exchange_rate_at_purchase=1.0,
-            purchase_date=purchase_date,
+            price=p["price"],
+            price_pln=p["price"],  # PLN więc 1:1
+            exchange_rate=1.0,
+            date=tx_date,
+            notes="Import XTB",
         )
-        db.add(position)
+        db.add(tx)
         imported.append(p["ticker"])
 
     db.commit()
 
     return {
         "imported": imported,
-        "skipped": skipped,
         "total_imported": len(imported),
-        "total_skipped": len(skipped),
     }
