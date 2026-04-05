@@ -13,7 +13,6 @@ export const usePortfolioStore = create((set, get) => ({
     try {
       const portfolios = await portfolioService.getAll()
       set({ portfolios, loading: false })
-      // Ustaw aktywne portfolio jeśli nie ma
       if (!get().activePortfolioId && portfolios.length > 0) {
         set({ activePortfolioId: portfolios[0].id })
         await get().fetchSummary(portfolios[0].id)
@@ -48,15 +47,9 @@ export const usePortfolioStore = create((set, get) => ({
     }))
   },
 
-  addPosition: async (portfolioId, payload) => {
-    await portfolioService.createPosition(portfolioId, payload)
+  addTransaction: async (portfolioId, payload) => {
+    await portfolioService.addTransaction(portfolioId, payload)
     await get().fetchSummary(portfolioId)
-  },
-
-  deletePosition: async (positionId) => {
-    await portfolioService.deletePosition(positionId)
-    const id = get().activePortfolioId
-    if (id) await get().fetchSummary(id)
   },
 
   setActivePortfolio: (id) => {
