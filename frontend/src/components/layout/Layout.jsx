@@ -1,8 +1,9 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { usePortfolioStore } from '../../store/portfolioStore'
 import CreatePortfolioModal from '../ui/CreatePortfolioModal'
+import ConfirmModal from '../ui/ConfirmModal'
 import clsx from 'clsx'
 
 const NAV = [
@@ -13,13 +14,26 @@ const NAV = [
 export default function Layout() {
   const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
-  const { portfolios, activePortfolioId, fetchPortfolios, setActivePortfolio } =
+  const { portfolios, activePortfolioId, fetchPortfolios, setActivePortfolio, deletePortfolio } =
     usePortfolioStore()
   const [showCreate, setShowCreate] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(null) // { id, name }
+  const [deleting, setDeleting] = useState(false)
+  const [hoveredPortfolio, setHoveredPortfolio] = useState(null)
 
   useEffect(() => {
     fetchPortfolios()
   }, [])
+
+  async function handleDeletePortfolio(id) {
+    setDeleting(true)
+    try {
+      await deletePortfolio(id)
+    } finally {
+      setDeleting(false)
+      setConfirmDelete(null)
+    }
+  }
 
   return (
     <div className="flex h-screen bg-gray-950">
@@ -32,18 +46,38 @@ export default function Layout() {
           <p className="text-xs text-gray-500 font-medium mb-2 uppercase tracking-wide">Portfele</p>
           <div className="space-y-1">
             {portfolios.map((p) => (
-              <button
+              <div
                 key={p.id}
-                onClick={() => setActivePortfolio(p.id)}
-                className={clsx(
-                  'w-full text-left text-sm px-3 py-2 rounded-lg transition-colors truncate',
-                  activePortfolioId === p.id
-                    ? 'bg-brand-600 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                )}
+                className="relative group"
+                onMouseEnter={() => setHoveredPortfolio(p.id)}
+                onMouseLeave={() => setHoveredPortfolio(null)}
               >
-                {p.name}
-              </button>
+                <button
+                  onClick={() => setActivePortfolio(p.id)}
+                  className={clsx(
+                    'w-full text-left text-sm px-3 py-2 rounded-lg transition-colors truncate pr-8',
+                    activePortfolioId === p.id
+                      ? 'bg-brand-600 text-white'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  )}
+                >
+                  {p.name}
+                </button>
+
+                {/* Przycisk usuwania — pojawia się po najechaniu */}
+                {hoveredPortfolio === p.id && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setConfirmDelete({ id: p.id, name: p.name })
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 hover:text-loss transition-colors text-xs leading-none"
+                    title="Usuń portfel"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             ))}
           </div>
           <button
@@ -86,6 +120,14 @@ export default function Layout() {
       </main>
 
       {showCreate && <CreatePortfolioModal onClose={() => setShowCreate(false)} />}
+
+      {confirmDelete && (
+        <ConfirmModal
+          message={`Usunąć portfel "${confirmDelete.name}"? Wszystkie pozycje zostaną trwale usunięte.`}
+          onConfirm={() => handleDeletePortfolio(confirmDelete.id)}
+          onClose={() => setConfirmDelete(null)}
+        />
+      )}
     </div>
   )
 }
