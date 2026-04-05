@@ -52,6 +52,7 @@ class Position(Base):
     avg_purchase_price_pln = Column(Float, nullable=True)
     exchange_rate_at_purchase = Column(Float, nullable=True, default=1.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    purchase_date = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     portfolio = relationship("Portfolio", back_populates="positions")
