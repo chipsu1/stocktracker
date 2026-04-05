@@ -5,7 +5,7 @@ import clsx from 'clsx'
 const BACKEND_URL = 'https://stocktracker-production-5f5f.up.railway.app'
 
 export default function ImportXTBModal({ onClose }) {
-  const { activePortfolioId, fetchSummary } = usePortfolioStore()
+  const { activePortfolioId, fetchSummary, fetchPortfolios } = usePortfolioStore()
   const [file, setFile] = useState(null)
   const [merge, setMerge] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -33,7 +33,9 @@ export default function ImportXTBModal({ onClose }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Błąd importu')
       setResult(data)
-      await fetchSummary(activePortfolioId)
+      // Odśwież portfele i summary bezpiecznie
+      await fetchPortfolios()
+      if (activePortfolioId) await fetchSummary(activePortfolioId)
     } catch (err) {
       setError(err.message)
     } finally {
