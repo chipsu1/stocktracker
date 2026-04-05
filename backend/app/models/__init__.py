@@ -1,2 +1,2 @@
 from app.models.user import User
-from app.models.portfolio import Portfolio, Position, Transaction
+from app.models.portfolio import Portfolio, Transaction
