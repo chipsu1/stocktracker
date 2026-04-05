@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { usePortfolioStore } from '../store/portfolioStore'
 import AddPositionModal from '../components/ui/AddPositionModal'
 import ConfirmModal from '../components/ui/ConfirmModal'
+import ImportXTBModal from '../components/ui/ImportXTBModal'
 import clsx from 'clsx'
 
 function fmt(v, decimals = 2) {
@@ -39,7 +40,8 @@ function PLNChange({ value }) {
 export default function PositionsPage() {
   const { summary, loading, activePortfolioId, portfolios, deletePosition, fetchSummary } = usePortfolioStore()
   const [showAdd, setShowAdd] = useState(false)
-  const [confirm, setConfirm] = useState(null) // { id, name }
+  const [showImport, setShowImport] = useState(false)
+  const [confirm, setConfirm] = useState(null)
   const [deleting, setDeleting] = useState(null)
 
   const portfolio = portfolios.find((p) => p.id === activePortfolioId)
@@ -77,6 +79,9 @@ export default function PositionsPage() {
           <button onClick={handleRefresh} className="btn-ghost text-sm" disabled={loading}>
             {loading ? 'Odświeżanie...' : '↻ Odśwież ceny'}
           </button>
+          <button onClick={() => setShowImport(true)} className="btn-ghost text-sm">
+            ↑ Importuj XTB
+          </button>
           <button onClick={() => setShowAdd(true)} className="btn-primary text-sm">
             + Dodaj pozycję
           </button>
@@ -105,7 +110,7 @@ export default function PositionsPage() {
             {positions.length === 0 && (
               <tr>
                 <td colSpan={12} className="px-4 py-12 text-center text-gray-600">
-                  Brak pozycji. Kliknij „Dodaj pozycję".
+                  Brak pozycji. Kliknij „Dodaj pozycję" lub „Importuj XTB".
                 </td>
               </tr>
             )}
@@ -152,6 +157,7 @@ export default function PositionsPage() {
       </div>
 
       {showAdd && <AddPositionModal onClose={() => setShowAdd(false)} />}
+      {showImport && <ImportXTBModal onClose={() => setShowImport(false)} />}
 
       {confirm && (
         <ConfirmModal
