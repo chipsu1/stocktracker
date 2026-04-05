@@ -5,17 +5,17 @@ import clsx from 'clsx'
 const ASSET_CLASSES = ['Akcje', 'ETF', 'Obligacje', 'Krypto', 'Surowce', 'Inne']
 const CURRENCIES = ['PLN', 'USD', 'EUR', 'GBP', 'CHF']
 
-export default function AddPositionModal({ onClose }) {
+export default function AddPositionModal({ onClose, defaultTicker = '' }) {
   const { activePortfolioId, addPosition } = usePortfolioStore()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    ticker: '',
+    ticker: defaultTicker,
     quantity: '',
     avg_purchase_price: '',
     purchase_date: '',
     asset_class: 'Akcje',
-    currency: 'USD',
+    currency: 'PLN',
   })
 
   function set(key, value) {
@@ -47,7 +47,9 @@ export default function AddPositionModal({ onClose }) {
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
       <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-white font-semibold">Dodaj pozycję</h2>
+          <h2 className="text-white font-semibold">
+            {defaultTicker ? `Dodaj zakup — ${defaultTicker}` : 'Dodaj pozycję'}
+          </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none transition-colors">
             ×
           </button>
@@ -58,10 +60,10 @@ export default function AddPositionModal({ onClose }) {
             <label className="label">Ticker *</label>
             <input
               className="input"
-              placeholder="np. AAPL, CDR.WA, BTC-USD"
+              placeholder="np. AAPL, XTB.WA, BTC-USD"
               value={form.ticker}
               onChange={(e) => set('ticker', e.target.value)}
-              autoFocus
+              autoFocus={!defaultTicker}
               required
             />
           </div>
@@ -77,6 +79,7 @@ export default function AddPositionModal({ onClose }) {
                 placeholder="np. 10"
                 value={form.quantity}
                 onChange={(e) => set('quantity', e.target.value)}
+                autoFocus={!!defaultTicker}
                 required
               />
             </div>
