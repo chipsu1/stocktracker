@@ -34,7 +34,7 @@ def get_fx_rate_pln(currency: str) -> float:
         logger.warning(f"NBP FX fetch failed for {currency}: {e}")
         try:
             t = yf.Ticker(f"{currency}PLN=X")
-            hist = t.history(period="5d")
+            hist = t.history(period="5d", auto_adjust=True)
             if not hist.empty:
                 rate = float(hist["Close"].iloc[-1])
                 _fx_cache[currency] = (rate, datetime.utcnow())
@@ -45,8 +45,8 @@ def get_fx_rate_pln(currency: str) -> float:
 
 
 def _fetch_stooq(ticker: str) -> Optional[Tuple[float, float]]:
-    """Pobiera ostatnie zamknięcie z Stooq — działa zawsze, nie tylko w godzinach handlu."""
-    clean = ticker.upper().replace("WSE:", "").replace(".PL", "").replace(".pl", "")
+    """Pobiera ostatnie zamknięcie z Stooq — dla akcji GPW."""
+    clean = ticker.upper().replace("WSE:", "").replace(".WA", "").replace(".PL", "").replace(".pl", "")
     stooq_ticker = clean.lower() + ".pl"
     url = f"https://stooq.pl/q/d/l/?s={stooq_ticker}&i=d"
     try:
@@ -68,11 +68,12 @@ def _fetch_stooq(ticker: str) -> Optional[Tuple[float, float]]:
 
 
 def _fetch_yfinance(ticker: str) -> Optional[Tuple[float, float]]:
-    """Pobiera ostatnie zamknięcie z yfinance — działa zawsze."""
+    """Pobiera ostatnie zamknięcie z yfinance."""
     try:
         t = yf.Ticker(ticker)
-        hist = t.history(period="5d")
+        hist = t.history(period="5d", auto_adjust=True)
         if hist.empty:
+            logger.warning(f"yfinance: brak danych dla {ticker}")
             return None
         close = float(hist["Close"].iloc[-1])
         prev_close = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else close
@@ -89,26 +90,41 @@ def get_price(ticker: str, currency: str = "PLN") -> Dict:
         price, daily_pct, cached_at = _price_cache[cache_key]
         if _is_cache_valid(cached_at):
             fx_rate = get_fx_rate_pln(currency)
-            return {"ticker": ticker, "price": price, "daily_change_pct": daily_pct,
-                    "currency": currency, "fx_rate": fx_rate, "price_pln": price * fx_rate, "cached": True}
+            return {
+                "ticker": ticker, "price": price, "daily_change_pct": daily_pct,
+                "currency": currency, "fx_rate": fx_rate,
+                "price_pln": price * fx_rate, "cached": True
+            }
 
     result = None
-    is_gpw = ticker.upper().startswith("WSE:") or ticker.upper().endswith(".PL")
+    ticker_upper = ticker.upper()
+    is_gpw = (
+        ticker_upper.startswith("WSE:")
+        or ticker_upper.endswith(".WA")
+        or ticker_upper.endswith(".PL")
+    )
+
     if is_gpw:
         result = _fetch_stooq(ticker)
+
     if result is None:
         result = _fetch_yfinance(ticker)
 
     if result is None:
-        return {"ticker": ticker, "price": None, "daily_change_pct": None,
-                "currency": currency, "fx_rate": get_fx_rate_pln(currency), "price_pln": None,
-                "error": "Nie udało się pobrać ceny"}
+        return {
+            "ticker": ticker, "price": None, "daily_change_pct": None,
+            "currency": currency, "fx_rate": get_fx_rate_pln(currency),
+            "price_pln": None, "error": "Nie udało się pobrać ceny"
+        }
 
     price, daily_pct = result
     _price_cache[cache_key] = (price, daily_pct, datetime.utcnow())
     fx_rate = get_fx_rate_pln(currency)
-    return {"ticker": ticker, "price": price, "daily_change_pct": daily_pct,
-            "currency": currency, "fx_rate": fx_rate, "price_pln": price * fx_rate, "cached": False}
+    return {
+        "ticker": ticker, "price": price, "daily_change_pct": daily_pct,
+        "currency": currency, "fx_rate": fx_rate,
+        "price_pln": price * fx_rate, "cached": False
+    }
 
 
 def get_prices_batch(tickers_with_currency: list) -> Dict:
