@@ -22,23 +22,17 @@ export const portfolioService = {
     return data
   },
 
-  // Positions
-  async createPosition(portfolioId, payload) {
-    const { data } = await api.post(`/api/portfolios/${portfolioId}/positions`, payload)
-    return data
-  },
-  async updatePosition(positionId, payload) {
-    const { data } = await api.put(`/api/portfolios/positions/${positionId}`, payload)
-    return data
-  },
-  async deletePosition(positionId) {
-    await api.delete(`/api/portfolios/positions/${positionId}`)
-  },
-
   // Transactions
-  async addTransaction(positionId, payload) {
-    const { data } = await api.post(`/api/portfolios/positions/${positionId}/transactions`, payload)
+  async getTransactions(portfolioId) {
+    const { data } = await api.get(`/api/portfolios/${portfolioId}/transactions`)
     return data
+  },
+  async addTransaction(portfolioId, payload) {
+    const { data } = await api.post(`/api/portfolios/${portfolioId}/transactions`, payload)
+    return data
+  },
+  async deleteTransaction(transactionId) {
+    await api.delete(`/api/portfolios/transactions/${transactionId}`)
   },
 
   // Prices
