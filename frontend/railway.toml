@@ -1,7 +1,6 @@
 [build]
-builder = "dockerfile"
-dockerfilePath = "Dockerfile"
+buildCommand = "npm install && npm run build"
 
 [deploy]
+startCommand = "npx serve dist -p 8080"
 healthcheckPath = "/"
-healthcheckTimeout = 30
