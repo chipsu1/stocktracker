@@ -38,18 +38,13 @@ def _to_dt(val) -> datetime:
 
 
 def _get_cash_balance(xl: pd.ExcelFile) -> float:
-    """
-    Pobiera aktualny balans gotówki z nagłówka pliku XTB.
-    To jest suma wszystkich operacji cash (wpłaty - zakupy + sprzedaże + dywidendy itd.)
-    """
+    """Pobiera aktualny balans gotówki z nagłówka pliku XTB."""
     sheet = next((s for s in xl.sheet_names if "CASH" in s.upper()), None)
     if not sheet:
         return 0.0
     raw = pd.read_excel(xl, sheet_name=sheet, header=None)
-    # Balans jest w nagłówku — szukamy wiersza z "Balance"
     for i, row in raw.iterrows():
         if "Balance" in str(row.values):
-            # Następny wiersz ma wartość
             next_row = raw.iloc[i + 1]
             for val in next_row.values:
                 try:
@@ -99,33 +94,6 @@ def _parse_open_positions(xl: pd.ExcelFile) -> List[Dict]:
     return results
 
 
-def _get_dividends(xl: pd.ExcelFile) -> List[Dict]:
-    sheet = next((s for s in xl.sheet_names if "CASH" in s.upper()), None)
-    if not sheet:
-        return []
-    raw = pd.read_excel(xl, sheet_name=sheet, header=None)
-    header_row = _find_header_row(raw, "Type")
-    if header_row is None:
-        return []
-    df = pd.read_excel(xl, sheet_name=sheet, header=header_row)
-    df = df.dropna(subset=["Type"])
-
-    results = []
-    for _, row in df.iterrows():
-        t = str(row.get("Type", "")).strip().lower()
-        if t == "divident":
-            amt = row.get("Amount", 0)
-            if pd.notna(amt) and float(amt) > 0:
-                ticker = _ticker_for_app(row.get("Symbol"))
-                results.append({
-                    "ticker": ticker,
-                    "amount_pln": float(amt),
-                    "date": _to_dt(row.get("Time")),
-                    "notes": str(row.get("Comment", "") or ""),
-                })
-    return results
-
-
 @router.post("/{portfolio_id}/xtb")
 def import_xtb(
     portfolio_id: int,
@@ -137,8 +105,8 @@ def import_xtb(
     """
     Importuje dane z pliku XTB (.xlsx):
     1. Otwarte pozycje → transakcje BUY
-    2. Aktualny balans gotówki → jedna wpłata (żeby saldo się zgadzało)
-    3. Dywidendy → transakcje DIVIDEND
+    2. Jedna wpłata startowa = wartość pozycji + balans gotówki
+       (zawiera całą historię: wpłaty, sprzedaże, dywidendy, odsetki)
     """
     get_portfolio(db, portfolio_id, current_user.id)
 
@@ -152,27 +120,26 @@ def import_xtb(
         raise HTTPException(400, "Nie udało się odczytać pliku Excel")
 
     open_positions = _parse_open_positions(xl)
-    dividends = _get_dividends(xl)
 
-    # Wylicz łączną wartość otwartych pozycji
+    # Łączna wartość otwartych pozycji
     total_positions_value = sum(p["purchase_value"] for p in open_positions)
 
-    # Pobierz aktualny balans gotówki z nagłówka pliku
+    # Aktualny balans gotówki z nagłówka pliku
     cash_balance = _get_cash_balance(xl)
 
-    # Kwota wpłaty = wartość pozycji + balans gotówki
-    # Bo: wpłata - zakupy = balans → wpłata = zakupy + balans
+    # Wpłata startowa = wartość pozycji + balans gotówki
+    # Skąd: saldo = wpłaty - zakupy → wpłaty = zakupy + saldo
     deposit_amount = total_positions_value + cash_balance
 
-    imported = {"buy": 0, "deposit": 0, "dividend": 0}
+    imported = {"buy": 0, "deposit": 0}
 
-    # Jedna wpłata startowa reprezentująca całą historię
+    # Jedna wpłata startowa
     if deposit_amount > 0:
         db.add(Transaction(
             portfolio_id=portfolio_id,
             transaction_type="deposit",
             amount_pln=round(deposit_amount, 2),
-            date=datetime(2025, 4, 14),  # Data pierwszego importu STC
+            date=datetime(2025, 4, 14),
             notes="Import XTB: saldo historyczne",
         ))
         imported["deposit"] += 1
@@ -194,21 +161,6 @@ def import_xtb(
         )
         db.add(tx)
         imported["buy"] += 1
-
-    # Dywidendy
-    for div in dividends:
-        tx = Transaction(
-            portfolio_id=portfolio_id,
-            transaction_type="dividend",
-            ticker=div["ticker"],
-            price=div["amount_pln"],
-            price_pln=div["amount_pln"],
-            amount_pln=div["amount_pln"],
-            date=div["date"],
-            notes=div["notes"] or "Import XTB: dywidenda",
-        )
-        db.add(tx)
-        imported["dividend"] += 1
 
     db.commit()
 
