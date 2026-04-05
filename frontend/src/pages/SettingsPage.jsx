@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { usePortfolioStore } from '../store/portfolioStore'
 import CreatePortfolioModal from '../components/ui/CreatePortfolioModal'
 import ConfirmModal from '../components/ui/ConfirmModal'
 
 export default function SettingsPage() {
-  const { portfolios, deletePortfolio, fetchPortfolios } = usePortfolioStore()
+  const navigate = useNavigate()
+  const { portfolios, deletePortfolio, fetchPortfolios, setActivePortfolio } = usePortfolioStore()
   const [showCreate, setShowCreate] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [editId, setEditId] = useState(null)
@@ -47,6 +49,11 @@ export default function SettingsPage() {
     }
   }
 
+  function handleGoToPortfolio(id) {
+    setActivePortfolio(id)
+    navigate('/dashboard')
+  }
+
   return (
     <div className="p-6 max-w-2xl">
       <h1 className="text-xl font-semibold text-white mb-1">Ustawienia</h1>
@@ -55,10 +62,7 @@ export default function SettingsPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-medium text-gray-300 uppercase tracking-wide">Portfele</h2>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="btn-primary text-sm"
-          >
+          <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
             + Nowy portfel
           </button>
         </div>
@@ -88,15 +92,21 @@ export default function SettingsPage() {
                   {error && <p className="text-loss text-xs">{error}</p>}
                 </div>
               ) : (
-                <div className="flex-1">
-                  <p className="text-white text-sm font-medium">{p.name}</p>
+                <button
+                  onClick={() => handleGoToPortfolio(p.id)}
+                  className="flex-1 text-left group"
+                >
+                  <p className="text-white text-sm font-medium group-hover:text-brand-500 transition-colors">
+                    {p.name}
+                    <span className="ml-2 text-xs text-gray-600 group-hover:text-gray-400">→</span>
+                  </p>
                   <p className="text-xs text-gray-500">
                     {p.currency} · utworzony {new Date(p.created_at).toLocaleDateString('pl-PL')}
                   </p>
-                </div>
+                </button>
               )}
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-4">
                 {editId === p.id ? (
                   <>
                     <button
