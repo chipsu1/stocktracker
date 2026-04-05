@@ -39,10 +39,13 @@ class PositionCreate(BaseModel):
 
 
 class PositionUpdate(BaseModel):
+    ticker: Optional[str] = None
     name: Optional[str] = None
     asset_class: Optional[str] = None
+    currency: Optional[str] = None
     quantity: Optional[float] = None
     avg_purchase_price: Optional[float] = None
+    purchase_date: Optional[datetime] = None
 
 
 class PositionOut(BaseModel):
