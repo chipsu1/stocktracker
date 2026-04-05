@@ -41,6 +41,14 @@ export default function ImportXTBModal({ onClose }) {
     }
   }
 
+  const TX_LABELS = {
+    buy: 'Zakupy',
+    sell: 'Sprzedaże',
+    dividend: 'Dywidendy',
+    deposit: 'Wpłaty',
+    withdrawal: 'Wypłaty',
+  }
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
       <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-md p-6">
@@ -52,8 +60,8 @@ export default function ImportXTBModal({ onClose }) {
         {!result ? (
           <div className="space-y-4">
             <p className="text-sm text-gray-400">
-              Wgraj plik <span className="text-white font-mono">.xlsx</span> pobrany z XTB (Historia konta → Eksport).
-              Zaimportowane zostaną otwarte pozycje.
+              Wgraj plik <span className="text-white font-mono">.xlsx</span> pobrany z XTB.
+              Zaimportowane zostaną otwarte pozycje, wpłaty, dywidendy i odsetki.
             </p>
 
             <div
@@ -108,23 +116,18 @@ export default function ImportXTBModal({ onClose }) {
             <div className="bg-gray-800 rounded-lg p-4 space-y-2">
               <p className="text-white font-medium">Import zakończony ✓</p>
               <p className="text-sm text-gray-300">
-                Zaimportowano: <span className="text-gain font-medium">{result.total_imported}</span> pozycji
+                Łącznie zaimportowano: <span className="text-gain font-medium">{result.total_imported}</span> transakcji
               </p>
-              {result.total_skipped > 0 && (
-                <p className="text-sm text-gray-300">
-                  Pominięto (już istnieją): <span className="text-yellow-400 font-medium">{result.total_skipped}</span>
-                </p>
-              )}
-              {result.imported.length > 0 && (
-                <div className="mt-2">
-                  <p className="text-xs text-gray-500 mb-1">Zaimportowane:</p>
-                  <p className="text-xs font-mono text-gray-300">{result.imported.join(', ')}</p>
-                </div>
-              )}
-              {result.skipped.length > 0 && (
-                <div className="mt-2">
-                  <p className="text-xs text-gray-500 mb-1">Pominięte:</p>
-                  <p className="text-xs font-mono text-yellow-500">{result.skipped.join(', ')}</p>
+              {result.imported && (
+                <div className="mt-3 space-y-1">
+                  {Object.entries(result.imported).map(([type, count]) =>
+                    count > 0 ? (
+                      <div key={type} className="flex justify-between text-xs">
+                        <span className="text-gray-400">{TX_LABELS[type] || type}</span>
+                        <span className="text-white font-medium">{count}</span>
+                      </div>
+                    ) : null
+                  )}
                 </div>
               )}
             </div>
