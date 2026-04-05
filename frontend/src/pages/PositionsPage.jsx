@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { usePortfolioStore } from '../store/portfolioStore'
-import AddPositionModal from '../components/ui/AddPositionModal'
-import ConfirmModal from '../components/ui/ConfirmModal'
+import AddTransactionModal from '../components/ui/AddTransactionModal'
 import ImportXTBModal from '../components/ui/ImportXTBModal'
-import EditPositionModal from '../components/ui/EditPositionModal'
+import ConfirmModal from '../components/ui/ConfirmModal'
 import clsx from 'clsx'
-
-const BACKEND_URL = 'https://stocktracker-production-5f5f.up.railway.app'
+import { portfolioService } from '../services/portfolio'
 
 function fmt(v, decimals = 2) {
   if (v == null) return '—'
@@ -45,98 +43,87 @@ function PLNChange({ value }) {
   )
 }
 
-// Grupuje pozycje po tickerze
-function groupPositions(positions) {
-  const groups = {}
-  for (const p of positions) {
-    if (!groups[p.ticker]) {
-      groups[p.ticker] = []
-    }
-    groups[p.ticker].push(p)
-  }
-  return groups
+const TX_LABELS = {
+  buy: 'Zakup',
+  sell: 'Sprzedaż',
+  dividend: 'Dywidenda',
+  split: 'Split',
+  deposit: 'Wpłata',
+  withdrawal: 'Wypłata',
 }
 
-// Liczy sumaryczne dane dla grupy tickerów
-function summarizeGroup(positions) {
-  const totalQuantity = positions.reduce((s, p) => s + p.quantity, 0)
-  const totalCost = positions.reduce((s, p) => s + p.quantity * p.avg_purchase_price, 0)
-  const avgPrice = totalCost / totalQuantity
-
-  const totalValuePln = positions.reduce((s, p) => s + (p.current_value_pln ?? 0), 0)
-  const totalCostPln = positions.reduce((s, p) => s + (p.cost_pln ?? p.quantity * p.avg_purchase_price), 0)
-  const gainLossPln = positions.some(p => p.current_value_pln != null)
-    ? positions.reduce((s, p) => s + (p.gain_loss_pln ?? 0), 0)
-    : null
-  const gainLossPct = gainLossPln != null && totalCostPln > 0
-    ? (gainLossPln / totalCostPln) * 100
-    : null
-
-  const dailyPct = positions[0]?.daily_change_pct ?? null
-  const currentPrice = positions[0]?.current_price ?? null
-
-  return {
-    ticker: positions[0].ticker,
-    name: positions[0].name,
-    asset_class: positions[0].asset_class,
-    currency: positions[0].currency,
-    totalQuantity,
-    avgPrice,
-    currentPrice,
-    dailyPct,
-    totalValuePln: positions.some(p => p.current_value_pln != null) ? totalValuePln : null,
-    gainLossPln,
-    gainLossPct,
-  }
+const TX_COLORS = {
+  buy: 'text-gain',
+  sell: 'text-loss',
+  dividend: 'text-blue-400',
+  split: 'text-yellow-400',
+  deposit: 'text-gain',
+  withdrawal: 'text-loss',
 }
 
 export default function PositionsPage() {
-  const { summary, loading, activePortfolioId, portfolios, deletePosition, fetchSummary } = usePortfolioStore()
+  const { summary, loading, activePortfolioId, portfolios, fetchSummary } = usePortfolioStore()
   const [showAdd, setShowAdd] = useState(false)
   const [showImport, setShowImport] = useState(false)
-  const [editPosition, setEditPosition] = useState(null)
-  const [addToPosition, setAddToPosition] = useState(null) // ticker do którego dodajemy
-  const [confirm, setConfirm] = useState(null)
-  const [deleting, setDeleting] = useState(null)
-  const [expanded, setExpanded] = useState({}) // { [ticker]: bool }
+  const [defaultTicker, setDefaultTicker] = useState('')
+  const [expanded, setExpanded] = useState({})
+  const [txByTicker, setTxByTicker] = useState({})
+  const [loadingTx, setLoadingTx] = useState(false)
+  const [txLoaded, setTxLoaded] = useState(false)
+  const [confirmTx, setConfirmTx] = useState(null)
+  const [deletingTx, setDeletingTx] = useState(null)
 
   const portfolio = portfolios.find((p) => p.id === activePortfolioId)
   const positions = summary?.positions || []
-  const groups = groupPositions(positions)
-  const tickers = Object.keys(groups)
-
-  function toggleExpand(ticker) {
-    setExpanded((prev) => ({ ...prev, [ticker]: !prev[ticker] }))
-  }
-
-  async function handleDelete(positionId) {
-    setDeleting(positionId)
-    try {
-      await deletePosition(positionId)
-    } finally {
-      setDeleting(null)
-    }
-  }
-
-  async function handleSaveEdit(positionId, data) {
-    const token = localStorage.getItem('token')
-    const res = await fetch(`${BACKEND_URL}/api/portfolios/positions/${positionId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    })
-    if (!res.ok) {
-      const err = await res.json()
-      throw new Error(err.detail || 'Błąd edycji')
-    }
-    await fetchSummary(activePortfolioId)
-  }
 
   async function handleRefresh() {
-    if (activePortfolioId) await fetchSummary(activePortfolioId)
+    if (activePortfolioId) {
+      setTxLoaded(false)
+      setTxByTicker({})
+      await fetchSummary(activePortfolioId)
+    }
+  }
+
+  async function loadAllTransactions() {
+    if (txLoaded) return
+    setLoadingTx(true)
+    try {
+      const all = await portfolioService.getTransactions(activePortfolioId)
+      const byTicker = {}
+      for (const tx of all) {
+        if (!tx.ticker) continue
+        if (!byTicker[tx.ticker]) byTicker[tx.ticker] = []
+        byTicker[tx.ticker].push(tx)
+      }
+      setTxByTicker(byTicker)
+      setTxLoaded(true)
+    } finally {
+      setLoadingTx(false)
+    }
+  }
+
+  function toggleExpand(ticker) {
+    const isOpen = expanded[ticker]
+    if (!isOpen) loadAllTransactions()
+    setExpanded((prev) => ({ ...prev, [ticker]: !isOpen }))
+  }
+
+  async function handleDeleteTx(txId) {
+    setDeletingTx(txId)
+    try {
+      await portfolioService.deleteTransaction(txId)
+      setTxLoaded(false)
+      setTxByTicker({})
+      await fetchSummary(activePortfolioId)
+    } finally {
+      setDeletingTx(null)
+      setConfirmTx(null)
+    }
+  }
+
+  function openAddForTicker(ticker) {
+    setDefaultTicker(ticker)
+    setShowAdd(true)
   }
 
   if (!activePortfolioId) {
@@ -152,7 +139,7 @@ export default function PositionsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-white">{portfolio?.name} — Pozycje</h1>
-          <p className="text-sm text-gray-500">{positions.length} pozycji ({tickers.length} tickerów)</p>
+          <p className="text-sm text-gray-500">{positions.length} pozycji</p>
         </div>
         <div className="flex gap-2">
           <button onClick={handleRefresh} className="btn-ghost text-sm" disabled={loading}>
@@ -161,19 +148,28 @@ export default function PositionsPage() {
           <button onClick={() => setShowImport(true)} className="btn-ghost text-sm">
             ↑ Importuj XTB
           </button>
-          <button onClick={() => setShowAdd(true)} className="btn-primary text-sm">
-            + Dodaj pozycję
+          <button onClick={() => { setDefaultTicker(''); setShowAdd(true) }} className="btn-primary text-sm">
+            + Dodaj transakcję
           </button>
         </div>
       </div>
+
+      {/* Saldo gotówkowe */}
+      {summary?.cash_pln != null && (
+        <div className="mb-4 px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl flex items-center gap-3">
+          <span className="text-xs text-gray-500 uppercase tracking-wide">Saldo gotówkowe</span>
+          <span className={clsx('font-semibold', summary.cash_pln >= 0 ? 'text-white' : 'text-loss')}>
+            {fmt(summary.cash_pln)}
+          </span>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-xl border border-gray-800">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-              <th className="text-left px-4 py-3 font-medium w-4"></th>
+              <th className="text-left px-4 py-3 font-medium w-6"></th>
               <th className="text-left px-4 py-3 font-medium">Ticker</th>
-              <th className="text-left px-4 py-3 font-medium">Nazwa</th>
               <th className="text-left px-4 py-3 font-medium">Klasa</th>
               <th className="text-right px-4 py-3 font-medium">Waluta</th>
               <th className="text-right px-4 py-3 font-medium">Liczba</th>
@@ -187,131 +183,116 @@ export default function PositionsPage() {
             </tr>
           </thead>
           <tbody>
-            {tickers.length === 0 && (
+            {positions.length === 0 && (
               <tr>
-                <td colSpan={13} className="px-4 py-12 text-center text-gray-600">
-                  Brak pozycji. Kliknij „Dodaj pozycję" lub „Importuj XTB".
+                <td colSpan={12} className="px-4 py-12 text-center text-gray-600">
+                  Brak pozycji. Dodaj transakcję zakupu lub zaimportuj z XTB.
                 </td>
               </tr>
             )}
 
-            {tickers.map((ticker) => {
-              const group = groups[ticker]
-              const isExpanded = expanded[ticker]
-              const hasMultiple = group.length > 1
-              const s = summarizeGroup(group)
+            {positions.map((p) => {
+              const isExpanded = expanded[p.ticker]
+              const tickerTx = txByTicker[p.ticker] || []
 
               return (
                 <>
-                  {/* Wiersz sumaryczny tickera */}
+                  {/* Główny wiersz pozycji */}
                   <tr
-                    key={`group-${ticker}`}
+                    key={`pos-${p.ticker}`}
                     className={clsx(
-                      'border-b border-gray-800/50 transition-colors',
-                      hasMultiple ? 'cursor-pointer hover:bg-gray-800/60' : 'hover:bg-gray-900/50',
-                      isExpanded && 'bg-gray-800/40'
+                      'border-b border-gray-800/50 transition-colors cursor-pointer',
+                      isExpanded ? 'bg-gray-800/40' : 'hover:bg-gray-900/50'
                     )}
-                    onClick={() => hasMultiple && toggleExpand(ticker)}
+                    onClick={() => toggleExpand(p.ticker)}
                   >
                     <td className="px-4 py-3 text-gray-500 text-xs">
-                      {hasMultiple ? (isExpanded ? '▼' : '▶') : ''}
+                      {isExpanded ? '▼' : '▶'}
                     </td>
-                    <td className="px-4 py-3 font-mono font-medium text-white">
-                      {ticker}
-                      {hasMultiple && (
-                        <span className="ml-2 text-xs text-gray-500 font-normal">×{group.length}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-300 max-w-[120px] truncate">{s.name || '—'}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{s.asset_class}</td>
-                    <td className="px-4 py-3 text-right text-gray-400">{s.currency}</td>
+                    <td className="px-4 py-3 font-mono font-medium text-white">{p.ticker}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{p.asset_class}</td>
+                    <td className="px-4 py-3 text-right text-gray-400">{p.currency}</td>
                     <td className="px-4 py-3 text-right text-gray-300">
-                      {fmtNum(s.totalQuantity, s.totalQuantity % 1 === 0 ? 0 : 2)}
+                      {fmtNum(p.quantity, p.quantity % 1 === 0 ? 0 : 4)}
                     </td>
                     <td className="px-4 py-3 text-right text-gray-300">
-                      {fmtNum(s.avgPrice)} {s.currency}
+                      {fmtNum(p.avg_purchase_price)} {p.currency}
                     </td>
                     <td className="px-4 py-3 text-right text-white font-medium">
-                      {s.currentPrice != null ? `${fmtNum(s.currentPrice)} ${s.currency}` : '—'}
+                      {p.current_price != null ? `${fmtNum(p.current_price)} ${p.currency}` : '—'}
                     </td>
-                    <td className="px-4 py-3 text-right"><Pct value={s.dailyPct} /></td>
-                    <td className="px-4 py-3 text-right text-white">{fmt(s.totalValuePln)}</td>
-                    <td className="px-4 py-3 text-right"><PLNChange value={s.gainLossPln} /></td>
-                    <td className="px-4 py-3 text-right"><Pct value={s.gainLossPct} /></td>
+                    <td className="px-4 py-3 text-right"><Pct value={p.daily_change_pct} /></td>
+                    <td className="px-4 py-3 text-right text-white">{fmt(p.current_value_pln)}</td>
+                    <td className="px-4 py-3 text-right"><PLNChange value={p.gain_loss_pln} /></td>
+                    <td className="px-4 py-3 text-right"><Pct value={p.gain_loss_pct} /></td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => setShowAdd(true) || setAddToPosition(ticker)}
-                        className="text-gray-500 hover:text-white transition-colors text-xs mr-2"
+                        onClick={() => openAddForTicker(p.ticker)}
+                        className="text-gray-500 hover:text-white transition-colors text-xs"
                       >
-                        +Kup
+                        + Transakcja
                       </button>
                     </td>
                   </tr>
 
-                  {/* Sub-wiersze po rozwinięciu */}
-                  {isExpanded && group.map((p) => (
-                    <tr
-                      key={`sub-${p.id}`}
-                      className="border-b border-gray-800/30 bg-gray-900/60 hover:bg-gray-900/80 transition-colors"
-                    >
-                      <td className="px-4 py-2"></td>
-                      <td className="px-4 py-2">
-                        <span className="text-xs text-gray-500 font-mono">#{p.id}</span>
-                      </td>
-                      <td className="px-4 py-2 text-xs text-gray-500">{fmtDate(p.purchase_date)}</td>
-                      <td className="px-4 py-2 text-xs text-gray-400">{p.asset_class}</td>
-                      <td className="px-4 py-2 text-right text-xs text-gray-400">{p.currency}</td>
-                      <td className="px-4 py-2 text-right text-xs text-gray-300">
-                        {fmtNum(p.quantity, p.quantity % 1 === 0 ? 0 : 2)}
-                      </td>
-                      <td className="px-4 py-2 text-right text-xs text-gray-300">
-                        {fmtNum(p.avg_purchase_price)} {p.currency}
-                      </td>
-                      <td className="px-4 py-2 text-right text-xs text-white">
-                        {p.current_price != null ? `${fmtNum(p.current_price)} ${p.currency}` : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-right"><Pct value={p.daily_change_pct} /></td>
-                      <td className="px-4 py-2 text-right text-xs text-white">{fmt(p.current_value_pln)}</td>
-                      <td className="px-4 py-2 text-right"><PLNChange value={p.gain_loss_pln} /></td>
-                      <td className="px-4 py-2 text-right"><Pct value={p.gain_loss_pct} /></td>
-                      <td className="px-4 py-2 text-right">
-                        <button
-                          onClick={() => setEditPosition(p)}
-                          className="text-gray-500 hover:text-white transition-colors text-xs mr-2"
+                  {/* Rozwinięte transakcje */}
+                  {isExpanded && (
+                    <>
+                      {loadingTx && (
+                        <tr key={`loading-${p.ticker}`}>
+                          <td colSpan={12} className="px-8 py-3 text-xs text-gray-500">Ładowanie...</td>
+                        </tr>
+                      )}
+                      {!loadingTx && tickerTx.length === 0 && (
+                        <tr key={`empty-${p.ticker}`}>
+                          <td colSpan={12} className="px-8 py-3 text-xs text-gray-600">Brak transakcji</td>
+                        </tr>
+                      )}
+                      {tickerTx.map((tx) => (
+                        <tr
+                          key={`tx-${tx.id}`}
+                          className="border-b border-gray-800/20 bg-gray-900/60 hover:bg-gray-900/80 transition-colors"
                         >
-                          Edytuj
-                        </button>
-                        <button
-                          onClick={() => setConfirm({ id: p.id, name: `${p.ticker} #${p.id}` })}
-                          disabled={deleting === p.id}
-                          className="text-gray-600 hover:text-loss transition-colors text-xs"
-                        >
-                          {deleting === p.id ? '...' : 'Usuń'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {/* Dla pojedynczej pozycji — przyciski w głównym wierszu */}
-                  {!hasMultiple && (
-                    <tr key={`actions-${ticker}`} className="hidden">
-                      <td colSpan={13}>
-                        {/* akcje są w ostatniej kolumnie głównego wiersza */}
-                      </td>
-                    </tr>
+                          <td className="px-4 py-2"></td>
+                          <td className="px-4 py-2">
+                            <span className={clsx('text-xs font-medium', TX_COLORS[tx.transaction_type])}>
+                              {TX_LABELS[tx.transaction_type] || tx.transaction_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-xs text-gray-500" colSpan={2}>
+                            {fmtDate(tx.date)}
+                          </td>
+                          <td className="px-4 py-2 text-right text-xs text-gray-300">
+                            {tx.quantity != null ? fmtNum(tx.quantity, tx.quantity % 1 === 0 ? 0 : 4) : '—'}
+                          </td>
+                          <td className="px-4 py-2 text-right text-xs text-gray-300">
+                            {tx.price != null ? `${fmtNum(tx.price)} ${tx.currency}` : '—'}
+                          </td>
+                          <td className="px-4 py-2 text-right text-xs text-gray-500" colSpan={4}>
+                            {tx.notes || ''}
+                          </td>
+                          <td className="px-4 py-2 text-right" colSpan={2}>
+                            <button
+                              onClick={() => setConfirmTx({ id: tx.id, label: `${TX_LABELS[tx.transaction_type]} ${p.ticker}` })}
+                              disabled={deletingTx === tx.id}
+                              className="text-gray-600 hover:text-loss transition-colors text-xs"
+                            >
+                              {deletingTx === tx.id ? '...' : 'Usuń'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
                   )}
                 </>
               )
             })}
-
-            {/* Dla pojedynczych pozycji dodaj przyciski Edytuj/Usuń w głównym wierszu */}
-            {/* To jest obsługiwane przez nadpisanie ostatniej kolumny wyżej */}
           </tbody>
 
           {positions.length > 0 && summary && (
             <tfoot>
               <tr className="border-t border-gray-700 bg-gray-900/80">
-                <td colSpan={9} className="px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">Łącznie</td>
+                <td colSpan={8} className="px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">Łącznie</td>
                 <td className="px-4 py-3 text-right text-white font-semibold">{fmt(summary.total_value_pln)}</td>
                 <td className="px-4 py-3 text-right"><PLNChange value={summary.total_gain_loss_pln} /></td>
                 <td className="px-4 py-3 text-right"><Pct value={summary.total_gain_loss_pct} /></td>
@@ -322,20 +303,18 @@ export default function PositionsPage() {
         </table>
       </div>
 
-      {showAdd && <AddPositionModal onClose={() => { setShowAdd(false); setAddToPosition(null) }} defaultTicker={addToPosition} />}
-      {showImport && <ImportXTBModal onClose={() => setShowImport(false)} />}
-      {editPosition && (
-        <EditPositionModal
-          position={editPosition}
-          onClose={() => setEditPosition(null)}
-          onSave={handleSaveEdit}
+      {showAdd && (
+        <AddTransactionModal
+          onClose={() => { setShowAdd(false); setDefaultTicker(''); setTxLoaded(false); setTxByTicker({}) }}
+          defaultTicker={defaultTicker}
         />
       )}
-      {confirm && (
+      {showImport && <ImportXTBModal onClose={() => setShowImport(false)} />}
+      {confirmTx && (
         <ConfirmModal
-          message={`Usunąć pozycję ${confirm.name}?`}
-          onConfirm={() => handleDelete(confirm.id)}
-          onClose={() => setConfirm(null)}
+          message={`Usunąć transakcję: ${confirmTx.label}?`}
+          onConfirm={() => handleDeleteTx(confirmTx.id)}
+          onClose={() => setConfirmTx(null)}
         />
       )}
     </div>
