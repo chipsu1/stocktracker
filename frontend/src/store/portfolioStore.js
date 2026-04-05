@@ -13,9 +13,14 @@ export const usePortfolioStore = create((set, get) => ({
     try {
       const portfolios = await portfolioService.getAll()
       set({ portfolios, loading: false })
-      if (!get().activePortfolioId && portfolios.length > 0) {
+      const currentId = get().activePortfolioId
+      const stillExists = portfolios.find((p) => p.id === currentId)
+      // Jeśli aktywne portfolio nie istnieje lub nie było ustawione — ustaw pierwsze
+      if (!stillExists && portfolios.length > 0) {
         set({ activePortfolioId: portfolios[0].id })
         await get().fetchSummary(portfolios[0].id)
+      } else if (stillExists) {
+        await get().fetchSummary(currentId)
       }
     } catch (e) {
       set({ error: e.message, loading: false })
@@ -40,11 +45,13 @@ export const usePortfolioStore = create((set, get) => ({
 
   deletePortfolio: async (id) => {
     await portfolioService.remove(id)
-    set((s) => ({
-      portfolios: s.portfolios.filter((p) => p.id !== id),
-      activePortfolioId: s.activePortfolioId === id ? null : s.activePortfolioId,
-      summary: s.activePortfolioId === id ? null : s.summary,
-    }))
+    const { portfolios, activePortfolioId } = get()
+    const remaining = portfolios.filter((p) => p.id !== id)
+    const newActiveId = activePortfolioId === id
+      ? (remaining.length > 0 ? remaining[0].id : null)
+      : activePortfolioId
+    set({ portfolios: remaining, activePortfolioId: newActiveId, summary: newActiveId ? get().summary : null })
+    if (newActiveId) await get().fetchSummary(newActiveId)
   },
 
   addTransaction: async (portfolioId, payload) => {
