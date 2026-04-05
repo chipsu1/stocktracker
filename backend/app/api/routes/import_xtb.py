@@ -134,15 +134,7 @@ def import_xtb(
     skipped = []
 
     for p in positions_to_import:
-        # Sprawdź czy taka pozycja już istnieje
-        existing = db.query(Position).filter(
-            Position.portfolio_id == portfolio_id,
-            Position.ticker == p["ticker"],
-        ).first()
 
-        if existing:
-            skipped.append(p["ticker"])
-            continue
 
         purchase_date = p["purchase_date"]
         if pd.notna(purchase_date) if not isinstance(purchase_date, type(None)) else False:
