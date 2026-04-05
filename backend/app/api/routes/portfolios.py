@@ -7,8 +7,8 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.portfolio import (
     PortfolioCreate, PortfolioUpdate, PortfolioOut,
-    PositionCreate, PositionUpdate, PositionOut,
-    TransactionCreate, TransactionOut, PortfolioSummary
+    TransactionCreate, TransactionOut,
+    PortfolioSummary,
 )
 from app.services import portfolio_service
 
@@ -43,15 +43,6 @@ def get_portfolio(
     return portfolio_service.get_portfolio(db, portfolio_id, current_user.id)
 
 
-@router.get("/{portfolio_id}/summary", response_model=PortfolioSummary)
-def get_portfolio_summary(
-    portfolio_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return portfolio_service.get_portfolio_summary(db, portfolio_id, current_user.id)
-
-
 @router.put("/{portfolio_id}", response_model=PortfolioOut)
 def update_portfolio(
     portfolio_id: int,
@@ -71,53 +62,40 @@ def delete_portfolio(
     portfolio_service.delete_portfolio(db, portfolio_id, current_user.id)
 
 
-# --- Positions ---
-
-@router.get("/{portfolio_id}/positions", response_model=List[PositionOut])
-def list_positions(
+@router.get("/{portfolio_id}/summary", response_model=PortfolioSummary)
+def get_portfolio_summary(
     portfolio_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return portfolio_service.get_positions(db, portfolio_id, current_user.id)
-
-
-@router.post("/{portfolio_id}/positions", response_model=PositionOut, status_code=201)
-def create_position(
-    portfolio_id: int,
-    data: PositionCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return portfolio_service.create_position(db, portfolio_id, current_user.id, data)
-
-
-@router.put("/positions/{position_id}", response_model=PositionOut)
-def update_position(
-    position_id: int,
-    data: PositionUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return portfolio_service.update_position(db, position_id, current_user.id, data)
-
-
-@router.delete("/positions/{position_id}", status_code=204)
-def delete_position(
-    position_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    portfolio_service.delete_position(db, position_id, current_user.id)
+    return portfolio_service.get_portfolio_summary(db, portfolio_id, current_user.id)
 
 
 # --- Transactions ---
 
-@router.post("/positions/{position_id}/transactions", response_model=TransactionOut, status_code=201)
+@router.get("/{portfolio_id}/transactions", response_model=List[TransactionOut])
+def list_transactions(
+    portfolio_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return portfolio_service.get_transactions(db, portfolio_id, current_user.id)
+
+
+@router.post("/{portfolio_id}/transactions", response_model=TransactionOut, status_code=201)
 def add_transaction(
-    position_id: int,
+    portfolio_id: int,
     data: TransactionCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return portfolio_service.add_transaction(db, position_id, current_user.id, data)
+    return portfolio_service.add_transaction(db, portfolio_id, current_user.id, data)
+
+
+@router.delete("/transactions/{transaction_id}", status_code=204)
+def delete_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    portfolio_service.delete_transaction(db, transaction_id, current_user.id)
