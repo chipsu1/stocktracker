@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api import api_router
 from app.db.database import Base, engine
-from app.models import User, Portfolio, Position, Transaction  # noqa: F401 — rejestracja modeli
+from app.models import User, Portfolio, Transaction  # noqa: F401 — rejestracja modeli
 
 # Utwórz tabele (w produkcji zastąp migracjami Alembic)
 Base.metadata.create_all(bind=engine)
