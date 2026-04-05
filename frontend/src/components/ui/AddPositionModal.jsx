@@ -1,131 +1,170 @@
 import { useState } from 'react'
-import { usePortfolioStore } from '../../store/portfolioStore'
+import { usePortfolioStore } from '../store/portfolioStore'
+import AddPositionModal from '../components/ui/AddPositionModal'
+import ConfirmModal from '../components/ui/ConfirmModal'
+import clsx from 'clsx'
 
-const ASSET_CLASSES = [
-  'Akcje polskie',
-  'Akcje zagraniczne',
-  'Obligacje skarbowe polskie',
-  'Obligacje skarbowe zagraniczne',
-  'Obligacje korporacyjne polskie',
-  'ETF',
-  'Gotówka',
-  'Waluty',
-  'Inne',
-]
+function fmt(v, decimals = 2) {
+  if (v == null) return '—'
+  return new Intl.NumberFormat('pl-PL', {
+    style: 'currency', currency: 'PLN',
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(v)
+}
 
-const CURRENCIES = ['PLN', 'USD', 'EUR', 'GBP', 'CHF']
+function fmtNum(v, decimals = 2) {
+  if (v == null) return '—'
+  return v.toFixed(decimals)
+}
 
-export default function AddPositionModal({ onClose }) {
-  const { activePortfolioId, addPosition } = usePortfolioStore()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [form, setForm] = useState({
-    ticker: '',
-    name: '',
-    asset_class: 'Akcje zagraniczne',
-    currency: 'PLN',
-    quantity: '',
-    avg_purchase_price: '',
-    exchange_rate_at_purchase: '1',
-    purchase_date: new Date().toISOString().split('T')[0],
-  })
+function fmtDate(v) {
+  if (!v) return '—'
+  return new Date(v).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
 
-  function set(key, value) {
-    setForm((f) => ({ ...f, [key]: value }))
-  }
+function Pct({ value }) {
+  if (value == null) return <span className="text-gray-600">—</span>
+  return (
+    <span className={clsx('font-medium', value >= 0 ? 'text-gain' : 'text-loss')}>
+      {value >= 0 ? '+' : ''}{value.toFixed(2)}%
+    </span>
+  )
+}
 
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+function PLNChange({ value }) {
+  if (value == null) return <span className="text-gray-600">—</span>
+  return (
+    <span className={clsx('text-sm', value >= 0 ? 'text-gain' : 'text-loss')}>
+      {value >= 0 ? '+' : ''}{fmt(value)}
+    </span>
+  )
+}
+
+export default function PositionsPage() {
+  const { summary, loading, activePortfolioId, portfolios, deletePosition, fetchSummary } = usePortfolioStore()
+  const [showAdd, setShowAdd] = useState(false)
+  const [confirm, setConfirm] = useState(null)
+  const [deleting, setDeleting] = useState(null)
+
+  const portfolio = portfolios.find((p) => p.id === activePortfolioId)
+  const positions = summary?.positions || []
+
+  async function handleDelete(positionId) {
+    setDeleting(positionId)
     try {
-      await addPosition(activePortfolioId, {
-        ...form,
-        quantity: parseFloat(form.quantity),
-        avg_purchase_price: parseFloat(form.avg_purchase_price),
-        exchange_rate_at_purchase: parseFloat(form.exchange_rate_at_purchase) || 1,
-        purchase_date: form.purchase_date ? new Date(form.purchase_date).toISOString() : null,
-      })
-      onClose()
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Błąd dodawania pozycji')
+      await deletePosition(positionId)
     } finally {
-      setLoading(false)
+      setDeleting(null)
     }
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-white font-semibold">Dodaj pozycję</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none">×</button>
-        </div>
+  async function handleRefresh() {
+    if (activePortfolioId) await fetchSummary(activePortfolioId)
+  }
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Ticker *</label>
-              <input className="input" placeholder="np. NVDA, XTB, ETR:SAP" value={form.ticker}
-                onChange={(e) => set('ticker', e.target.value.toUpperCase())} required />
-            </div>
-            <div>
-              <label className="label">Nazwa</label>
-              <input className="input" placeholder="Nvidia" value={form.name}
-                onChange={(e) => set('name', e.target.value)} />
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Klasa aktywów</label>
-            <select className="input" value={form.asset_class} onChange={(e) => set('asset_class', e.target.value)}>
-              {ASSET_CLASSES.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="label">Waluta</label>
-              <select className="input" value={form.currency} onChange={(e) => set('currency', e.target.value)}>
-                {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">Liczba</label>
-              <input className="input" type="number" step="any" min="0" placeholder="10" value={form.quantity}
-                onChange={(e) => set('quantity', e.target.value)} required />
-            </div>
-            <div>
-              <label className="label">Śr. cena zakupu</label>
-              <input className="input" type="number" step="any" min="0" placeholder="150.00" value={form.avg_purchase_price}
-                onChange={(e) => set('avg_purchase_price', e.target.value)} required />
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Data zakupu</label>
-            <input className="input" type="date" value={form.purchase_date}
-              onChange={(e) => set('purchase_date', e.target.value)} />
-          </div>
-
-          {form.currency !== 'PLN' && (
-            <div>
-              <label className="label">Kurs walutowy przy zakupie (1 {form.currency} = ? PLN)</label>
-              <input className="input" type="number" step="any" min="0" placeholder="4.28" value={form.exchange_rate_at_purchase}
-                onChange={(e) => set('exchange_rate_at_purchase', e.target.value)} />
-            </div>
-          )}
-
-          {error && <p className="text-loss text-sm">{error}</p>}
-
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="btn-ghost flex-1">Anuluj</button>
-            <button type="submit" className="btn-primary flex-1" disabled={loading}>
-              {loading ? 'Dodawanie...' : 'Dodaj pozycję'}
-            </button>
-          </div>
-        </form>
+  if (!activePortfolioId) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        Wybierz portfel w panelu bocznym.
       </div>
+    )
+  }
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-semibold text-white">{portfolio?.name} — Pozycje</h1>
+          <p className="text-sm text-gray-500">{positions.length} pozycji</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={handleRefresh} className="btn-ghost text-sm" disabled={loading}>
+            {loading ? 'Odświeżanie...' : '↻ Odśwież ceny'}
+          </button>
+          <button onClick={() => setShowAdd(true)} className="btn-primary text-sm">
+            + Dodaj pozycję
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-gray-800">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
+              <th className="text-left px-4 py-3 font-medium">Ticker</th>
+              <th className="text-left px-4 py-3 font-medium">Nazwa</th>
+              <th className="text-left px-4 py-3 font-medium">Klasa</th>
+              <th className="text-right px-4 py-3 font-medium">Waluta</th>
+              <th className="text-right px-4 py-3 font-medium">Liczba</th>
+              <th className="text-right px-4 py-3 font-medium">Śr. cena zakupu</th>
+              <th className="text-right px-4 py-3 font-medium">Data zakupu</th>
+              <th className="text-right px-4 py-3 font-medium">Obecna cena</th>
+              <th className="text-right px-4 py-3 font-medium">Zmiana dzienna</th>
+              <th className="text-right px-4 py-3 font-medium">Wartość (PLN)</th>
+              <th className="text-right px-4 py-3 font-medium">Zysk/Strata PLN</th>
+              <th className="text-right px-4 py-3 font-medium">% Zysk/Strata</th>
+              <th className="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {positions.length === 0 && (
+              <tr>
+                <td colSpan={13} className="px-4 py-12 text-center text-gray-600">
+                  Brak pozycji. Kliknij „Dodaj pozycję".
+                </td>
+              </tr>
+            )}
+            {positions.map((p) => (
+              <tr key={p.id} className="border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors">
+                <td className="px-4 py-3 font-mono font-medium text-white">{p.ticker}</td>
+                <td className="px-4 py-3 text-gray-300 max-w-[120px] truncate">{p.name || '—'}</td>
+                <td className="px-4 py-3 text-gray-400 text-xs">{p.asset_class}</td>
+                <td className="px-4 py-3 text-right text-gray-400">{p.currency}</td>
+                <td className="px-4 py-3 text-right text-gray-300">{fmtNum(p.quantity, p.quantity % 1 === 0 ? 0 : 2)}</td>
+                <td className="px-4 py-3 text-right text-gray-300">{fmtNum(p.avg_purchase_price)} {p.currency}</td>
+                <td className="px-4 py-3 text-right text-gray-400 text-xs">{fmtDate(p.purchase_date)}</td>
+                <td className="px-4 py-3 text-right text-white font-medium">
+                  {p.current_price != null ? `${fmtNum(p.current_price)} ${p.currency}` : '—'}
+                </td>
+                <td className="px-4 py-3 text-right"><Pct value={p.daily_change_pct} /></td>
+                <td className="px-4 py-3 text-right text-white">{fmt(p.current_value_pln)}</td>
+                <td className="px-4 py-3 text-right"><PLNChange value={p.gain_loss_pln} /></td>
+                <td className="px-4 py-3 text-right"><Pct value={p.gain_loss_pct} /></td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    onClick={() => setConfirm({ id: p.id, name: p.ticker })}
+                    disabled={deleting === p.id}
+                    className="text-gray-600 hover:text-loss transition-colors text-xs"
+                  >
+                    {deleting === p.id ? '...' : 'Usuń'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {positions.length > 0 && summary && (
+            <tfoot>
+              <tr className="border-t border-gray-700 bg-gray-900/80">
+                <td colSpan={9} className="px-4 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">Łącznie</td>
+                <td className="px-4 py-3 text-right text-white font-semibold">{fmt(summary.total_value_pln)}</td>
+                <td className="px-4 py-3 text-right"><PLNChange value={summary.total_gain_loss_pln} /></td>
+                <td className="px-4 py-3 text-right"><Pct value={summary.total_gain_loss_pct} /></td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      {showAdd && <AddPositionModal onClose={() => setShowAdd(false)} />}
+      {confirm && (
+        <ConfirmModal
+          message={`Usunąć pozycję ${confirm.name}?`}
+          onConfirm={() => handleDelete(confirm.id)}
+          onClose={() => setConfirm(null)}
+        />
+      )}
     </div>
   )
 }
