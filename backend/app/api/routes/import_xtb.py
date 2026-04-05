@@ -13,12 +13,6 @@ from app.services.portfolio_service import get_portfolio
 
 router = APIRouter(prefix="/import", tags=["import"])
 
-# Mapowanie typów XTB na typy transakcji w naszym systemie
-DEPOSIT_TYPES = {'ike deposit', 'ike cash transfer in', 'deposit', 'transfer in', 'cash in'}
-WITHDRAWAL_TYPES = {'ike cash transfer out', 'withdrawal', 'transfer out', 'cash out'}
-DIVIDEND_TYPES = {'divident', 'dividend'}
-INTEREST_TYPES = {'free-funds interest'}
-
 
 def _find_header_row(df_raw: pd.DataFrame, keyword: str) -> int:
     for i, row in df_raw.iterrows():
@@ -36,73 +30,34 @@ def _ticker_for_app(xtb_symbol) -> str:
     return s
 
 
-def _parse_cash_operations(xl: pd.ExcelFile) -> List[Dict]:
+def _to_dt(val) -> datetime:
+    try:
+        return pd.Timestamp(val).to_pydatetime()
+    except Exception:
+        return datetime.utcnow()
+
+
+def _get_cash_balance(xl: pd.ExcelFile) -> float:
+    """
+    Pobiera aktualny balans gotówki z nagłówka pliku XTB.
+    To jest suma wszystkich operacji cash (wpłaty - zakupy + sprzedaże + dywidendy itd.)
+    """
     sheet = next((s for s in xl.sheet_names if "CASH" in s.upper()), None)
     if not sheet:
-        return []
-
+        return 0.0
     raw = pd.read_excel(xl, sheet_name=sheet, header=None)
-    header_row = _find_header_row(raw, "Type")
-    if header_row is None:
-        return []
-
-    df = pd.read_excel(xl, sheet_name=sheet, header=header_row)
-    df = df.dropna(subset=["Type"])
-    df = df[df["Type"].astype(str).str.strip() != ""]
-
-    results = []
-    for _, row in df.iterrows():
-        tx_type_raw = str(row.get("Type", "")).strip().lower()
-        amount = row.get("Amount", None)
-        time = row.get("Time", None)
-        symbol = row.get("Symbol", None)
-        comment = str(row.get("Comment", ""))
-
-        if pd.isna(amount):
-            continue
-
-        amount = float(amount)
-        tx_date = pd.Timestamp(time).to_pydatetime() if pd.notna(time) else datetime.utcnow()
-        ticker = _ticker_for_app(symbol)
-
-        if tx_type_raw in DEPOSIT_TYPES:
-            results.append({
-                "type": "deposit",
-                "amount_pln": abs(amount),
-                "date": tx_date,
-                "notes": f"Import XTB: {row.get('Type', '')}",
-            })
-
-        elif tx_type_raw in WITHDRAWAL_TYPES:
-            results.append({
-                "type": "withdrawal",
-                "amount_pln": abs(amount),
-                "date": tx_date,
-                "notes": f"Import XTB: {row.get('Type', '')}",
-            })
-
-        elif tx_type_raw in DIVIDEND_TYPES and ticker:
-            results.append({
-                "type": "dividend",
-                "ticker": ticker,
-                "amount_pln": abs(amount),
-                "date": tx_date,
-                "notes": comment,
-            })
-
-        elif tx_type_raw in INTEREST_TYPES:
-            # Odsetki traktujemy jako wpłatę
-            if amount > 0:
-                results.append({
-                    "type": "deposit",
-                    "amount_pln": abs(amount),
-                    "date": tx_date,
-                    "notes": f"Import XTB: odsetki",
-                })
-
-        # Stock purchase i Stock sale pomijamy — bierzemy z OPEN POSITIONS
-
-    return results
+    # Balans jest w nagłówku — szukamy wiersza z "Balance"
+    for i, row in raw.iterrows():
+        if "Balance" in str(row.values):
+            # Następny wiersz ma wartość
+            next_row = raw.iloc[i + 1]
+            for val in next_row.values:
+                try:
+                    if pd.notna(val) and isinstance(val, (int, float)):
+                        return float(val)
+                except Exception:
+                    pass
+    return 0.0
 
 
 def _parse_open_positions(xl: pd.ExcelFile) -> List[Dict]:
@@ -125,18 +80,49 @@ def _parse_open_positions(xl: pd.ExcelFile) -> List[Dict]:
         if not ticker:
             continue
         open_time = row.get("Open time")
-        tx_date = pd.Timestamp(open_time).to_pydatetime() if pd.notna(open_time) else datetime.utcnow()
+        tx_date = _to_dt(open_time) if pd.notna(open_time) else datetime.utcnow()
+        purchase_value = float(row.get("Purchase value", 0) or 0)
+        comment = str(row.get("Comment", "") or "").strip()
 
         results.append({
             "type": "buy",
             "ticker": ticker,
             "quantity": float(row["Volume"]),
             "price": float(row["Open price"]),
+            "purchase_value": purchase_value,
             "date": tx_date,
             "asset_class": "Akcje",
             "currency": "PLN",
+            "comment": comment,
         })
 
+    return results
+
+
+def _get_dividends(xl: pd.ExcelFile) -> List[Dict]:
+    sheet = next((s for s in xl.sheet_names if "CASH" in s.upper()), None)
+    if not sheet:
+        return []
+    raw = pd.read_excel(xl, sheet_name=sheet, header=None)
+    header_row = _find_header_row(raw, "Type")
+    if header_row is None:
+        return []
+    df = pd.read_excel(xl, sheet_name=sheet, header=header_row)
+    df = df.dropna(subset=["Type"])
+
+    results = []
+    for _, row in df.iterrows():
+        t = str(row.get("Type", "")).strip().lower()
+        if t == "divident":
+            amt = row.get("Amount", 0)
+            if pd.notna(amt) and float(amt) > 0:
+                ticker = _ticker_for_app(row.get("Symbol"))
+                results.append({
+                    "ticker": ticker,
+                    "amount_pln": float(amt),
+                    "date": _to_dt(row.get("Time")),
+                    "notes": str(row.get("Comment", "") or ""),
+                })
     return results
 
 
@@ -149,10 +135,10 @@ def import_xtb(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Importuje pełną historię operacji z pliku XTB (.xlsx):
-    - Otwarte pozycje → transakcje BUY
-    - Wpłaty/wypłaty → deposit/withdrawal
-    - Dywidendy → dividend
+    Importuje dane z pliku XTB (.xlsx):
+    1. Otwarte pozycje → transakcje BUY
+    2. Aktualny balans gotówki → jedna wpłata (żeby saldo się zgadzało)
+    3. Dywidendy → transakcje DIVIDEND
     """
     get_portfolio(db, portfolio_id, current_user.id)
 
@@ -165,30 +151,33 @@ def import_xtb(
     except Exception:
         raise HTTPException(400, "Nie udało się odczytać pliku Excel")
 
-    cash_ops = _parse_cash_operations(xl)
     open_positions = _parse_open_positions(xl)
+    dividends = _get_dividends(xl)
 
-    if not cash_ops and not open_positions:
-        raise HTTPException(400, "Brak danych do importu w pliku")
+    # Wylicz łączną wartość otwartych pozycji
+    total_positions_value = sum(p["purchase_value"] for p in open_positions)
 
-    imported = {"buy": 0, "deposit": 0, "withdrawal": 0, "dividend": 0}
+    # Pobierz aktualny balans gotówki z nagłówka pliku
+    cash_balance = _get_cash_balance(xl)
 
-    # Importuj operacje gotówkowe
-    for op in cash_ops:
-        tx = Transaction(
+    # Kwota wpłaty = wartość pozycji + balans gotówki
+    # Bo: wpłata - zakupy = balans → wpłata = zakupy + balans
+    deposit_amount = total_positions_value + cash_balance
+
+    imported = {"buy": 0, "deposit": 0, "dividend": 0}
+
+    # Jedna wpłata startowa reprezentująca całą historię
+    if deposit_amount > 0:
+        db.add(Transaction(
             portfolio_id=portfolio_id,
-            transaction_type=op["type"],
-            ticker=op.get("ticker"),
-            amount_pln=op.get("amount_pln"),
-            price=op.get("amount_pln") if op["type"] == "dividend" else None,
-            price_pln=op.get("amount_pln") if op["type"] == "dividend" else None,
-            date=op["date"],
-            notes=op.get("notes", "Import XTB"),
-        )
-        db.add(tx)
-        imported[op["type"]] = imported.get(op["type"], 0) + 1
+            transaction_type="deposit",
+            amount_pln=round(deposit_amount, 2),
+            date=datetime(2025, 4, 14),  # Data pierwszego importu STC
+            notes="Import XTB: saldo historyczne",
+        ))
+        imported["deposit"] += 1
 
-    # Importuj otwarte pozycje jako zakupy
+    # Otwarte pozycje jako zakupy
     for pos in open_positions:
         tx = Transaction(
             portfolio_id=portfolio_id,
@@ -201,14 +190,31 @@ def import_xtb(
             price_pln=pos["price"],
             exchange_rate=1.0,
             date=pos["date"],
-            notes="Import XTB - otwarta pozycja",
+            notes=f"Import XTB - {pos.get('comment', 'otwarta pozycja')}",
         )
         db.add(tx)
         imported["buy"] += 1
+
+    # Dywidendy
+    for div in dividends:
+        tx = Transaction(
+            portfolio_id=portfolio_id,
+            transaction_type="dividend",
+            ticker=div["ticker"],
+            price=div["amount_pln"],
+            price_pln=div["amount_pln"],
+            amount_pln=div["amount_pln"],
+            date=div["date"],
+            notes=div["notes"] or "Import XTB: dywidenda",
+        )
+        db.add(tx)
+        imported["dividend"] += 1
 
     db.commit()
 
     return {
         "imported": imported,
         "total_imported": sum(imported.values()),
+        "cash_balance": cash_balance,
+        "deposit_amount": round(deposit_amount, 2),
     }
