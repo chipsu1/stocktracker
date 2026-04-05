@@ -35,6 +35,7 @@ class PositionCreate(BaseModel):
     quantity: float
     avg_purchase_price: float
     exchange_rate_at_purchase: Optional[float] = 1.0
+    purchase_date: Optional[datetime] = None
 
 
 class PositionUpdate(BaseModel):
@@ -55,6 +56,7 @@ class PositionOut(BaseModel):
     avg_purchase_price: float
     avg_purchase_price_pln: Optional[float]
     exchange_rate_at_purchase: Optional[float]
+    purchase_date: Optional[datetime]
     created_at: datetime
 
     class Config:
