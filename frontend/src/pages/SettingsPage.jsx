@@ -92,13 +92,66 @@ export default function SettingsPage() {
                   {error && <p className="text-loss text-xs">{error}</p>}
                 </div>
               ) : (
-                <button
-                  onClick={() => handleGoToPortfolio(p.id)}
-                  className="flex-1 text-left group"
-                >
+                <button onClick={() => handleGoToPortfolio(p.id)} className="flex-1 text-left group">
                   <p className="text-gray-900 text-sm font-medium group-hover:text-brand-600 transition-colors">
                     {p.name}
                     <span className="ml-2 text-xs text-gray-400 group-hover:text-gray-500">→</span>
                   </p>
                   <p className="text-xs text-gray-400">
-                    {p.currency} · utworzony {new Date(p.created_at).toLocale
+                    {p.currency} · utworzony {new Date(p.created_at).toLocaleDateString('pl-PL')}
+                  </p>
+                </button>
+              )}
+
+              <div className="flex items-center gap-2 ml-4">
+                {editId === p.id ? (
+                  <>
+                    <button
+                      onClick={() => handleRename(p.id)}
+                      disabled={saving}
+                      className="btn-primary text-xs px-3 py-1"
+                    >
+                      {saving ? '...' : 'Zapisz'}
+                    </button>
+                    <button
+                      onClick={() => setEditId(null)}
+                      className="btn-ghost text-xs px-3 py-1"
+                    >
+                      Anuluj
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => { setEditId(p.id); setEditName(p.name); setError('') }}
+                      className="text-xs text-gray-500 hover:text-gray-900 transition-colors px-2 py-1 rounded hover:bg-gray-100"
+                    >
+                      Zmień nazwę
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete({ id: p.id, name: p.name })}
+                      disabled={deleting === p.id}
+                      className="text-xs text-gray-400 hover:text-loss transition-colors px-2 py-1 rounded hover:bg-gray-100"
+                    >
+                      {deleting === p.id ? '...' : 'Usuń'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {showCreate && <CreatePortfolioModal onClose={() => setShowCreate(false)} />}
+
+      {confirmDelete && (
+        <ConfirmModal
+          message={`Usunąć portfel "${confirmDelete.name}"? Wszystkie pozycje i transakcje zostaną trwale usunięte.`}
+          onConfirm={() => handleDelete(confirmDelete.id)}
+          onClose={() => setConfirmDelete(null)}
+        />
+      )}
+    </div>
+  )
+}
