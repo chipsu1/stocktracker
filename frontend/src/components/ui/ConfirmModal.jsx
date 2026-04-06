@@ -1,8 +1,8 @@
 export default function ConfirmModal({ message, onConfirm, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-sm p-6">
-        <p className="text-white text-sm mb-6">{message}</p>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white border border-gray-200 rounded-xl w-full max-w-sm p-6 shadow-lg">
+        <p className="text-gray-900 text-sm mb-6">{message}</p>
         <div className="flex gap-3">
           <button onClick={onClose} className="btn-ghost flex-1">
             Anuluj
