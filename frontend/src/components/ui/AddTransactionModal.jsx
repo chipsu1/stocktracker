@@ -57,7 +57,6 @@ export default function AddTransactionModal({ onClose, defaultTicker = '' }) {
         date: form.date ? new Date(form.date).toISOString() : null,
         notes: form.notes || null,
       }
-
       if (txType.hasTicker) {
         payload.ticker = form.ticker.trim().toUpperCase()
         payload.asset_class = form.asset_class
@@ -70,10 +69,7 @@ export default function AddTransactionModal({ onClose, defaultTicker = '' }) {
 
       const res = await fetch(`/api/portfolios/${activePortfolioId}/transactions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
       })
       const data = await res.json()
@@ -88,15 +84,14 @@ export default function AddTransactionModal({ onClose, defaultTicker = '' }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-md p-6">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white border border-gray-200 rounded-xl w-full max-w-md p-6 shadow-lg">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-white font-semibold">Dodaj transakcję</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none transition-colors">×</button>
+          <h2 className="text-gray-900 font-semibold">Dodaj transakcję</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-900 text-xl leading-none transition-colors">×</button>
         </div>
 
-        {/* Typ transakcji */}
-        <div className="grid grid-cols-3 gap-1 mb-5 bg-gray-800 p-1 rounded-lg">
+        <div className="grid grid-cols-3 gap-1 mb-5 bg-gray-100 p-1 rounded-lg">
           {TRANSACTION_TYPES.map((t) => (
             <button
               key={t.value}
@@ -105,8 +100,8 @@ export default function AddTransactionModal({ onClose, defaultTicker = '' }) {
               className={clsx(
                 'text-xs py-1.5 px-2 rounded-md transition-colors font-medium',
                 type === t.value
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-500 hover:text-gray-300'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
               )}
             >
               {t.label}
@@ -114,22 +109,14 @@ export default function AddTransactionModal({ onClose, defaultTicker = '' }) {
           ))}
         </div>
 
-        <p className="text-xs text-gray-500 mb-4">{DESCRIPTIONS[type]}</p>
+        <p className="text-xs text-gray-400 mb-4">{DESCRIPTIONS[type]}</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-
-          {/* Ticker */}
           {txType.hasTicker && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Ticker *</label>
-                <input
-                  className="input"
-                  placeholder="np. XTB.WA, AAPL"
-                  value={form.ticker}
-                  onChange={(e) => set('ticker', e.target.value)}
-                  required
-                />
+                <input className="input" placeholder="np. XTB.WA, AAPL" value={form.ticker} onChange={(e) => set('ticker', e.target.value)} required />
               </div>
               <div>
                 <label className="label">Klasa aktywów</label>
@@ -140,47 +127,23 @@ export default function AddTransactionModal({ onClose, defaultTicker = '' }) {
             </div>
           )}
 
-          {/* Ilość i cena */}
           {(txType.hasQty || txType.hasPrice) && (
             <div className="grid grid-cols-2 gap-3">
               {txType.hasQty && (
                 <div>
-                  <label className="label">
-                    {type === 'split' ? 'Współczynnik *' : 'Liczba jednostek *'}
-                  </label>
-                  <input
-                    className="input"
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder={type === 'split' ? 'np. 4' : 'np. 10'}
-                    value={form.quantity}
-                    onChange={(e) => set('quantity', e.target.value)}
-                    required
-                  />
+                  <label className="label">{type === 'split' ? 'Współczynnik *' : 'Liczba jednostek *'}</label>
+                  <input className="input" type="number" step="any" min="0" placeholder={type === 'split' ? 'np. 4' : 'np. 10'} value={form.quantity} onChange={(e) => set('quantity', e.target.value)} required />
                 </div>
               )}
               {txType.hasPrice && (
                 <div>
-                  <label className="label">
-                    {type === 'dividend' ? 'Kwota dywidendy *' : 'Cena jednostkowa *'}
-                  </label>
-                  <input
-                    className="input"
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder="np. 95.40"
-                    value={form.price}
-                    onChange={(e) => set('price', e.target.value)}
-                    required
-                  />
+                  <label className="label">{type === 'dividend' ? 'Kwota dywidendy *' : 'Cena jednostkowa *'}</label>
+                  <input className="input" type="number" step="any" min="0" placeholder="np. 95.40" value={form.price} onChange={(e) => set('price', e.target.value)} required />
                 </div>
               )}
             </div>
           )}
 
-          {/* Waluta i kurs */}
           {txType.hasTicker && (
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -192,57 +155,27 @@ export default function AddTransactionModal({ onClose, defaultTicker = '' }) {
               {form.currency !== 'PLN' && (
                 <div>
                   <label className="label">Kurs (1 {form.currency} = ? PLN)</label>
-                  <input
-                    className="input"
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder="np. 4.05"
-                    value={form.exchange_rate}
-                    onChange={(e) => set('exchange_rate', e.target.value)}
-                  />
+                  <input className="input" type="number" step="any" min="0" placeholder="np. 4.05" value={form.exchange_rate} onChange={(e) => set('exchange_rate', e.target.value)} />
                 </div>
               )}
             </div>
           )}
 
-          {/* Kwota PLN dla wpłat/wypłat */}
           {txType.hasCash && (
             <div>
               <label className="label">Kwota (PLN) *</label>
-              <input
-                className="input"
-                type="number"
-                step="any"
-                min="0"
-                placeholder="np. 5000"
-                value={form.amount_pln}
-                onChange={(e) => set('amount_pln', e.target.value)}
-                required
-              />
+              <input className="input" type="number" step="any" min="0" placeholder="np. 5000" value={form.amount_pln} onChange={(e) => set('amount_pln', e.target.value)} required />
             </div>
           )}
 
-          {/* Data */}
           <div>
             <label className="label">Data transakcji</label>
-            <input
-              className="input"
-              type="date"
-              value={form.date}
-              onChange={(e) => set('date', e.target.value)}
-            />
+            <input className="input" type="date" value={form.date} onChange={(e) => set('date', e.target.value)} />
           </div>
 
-          {/* Notatki */}
           <div>
             <label className="label">Notatki</label>
-            <input
-              className="input"
-              placeholder="Opcjonalnie..."
-              value={form.notes}
-              onChange={(e) => set('notes', e.target.value)}
-            />
+            <input className="input" placeholder="Opcjonalnie..." value={form.notes} onChange={(e) => set('notes', e.target.value)} />
           </div>
 
           {error && <p className="text-loss text-sm">{error}</p>}
