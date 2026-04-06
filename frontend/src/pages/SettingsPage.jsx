@@ -56,12 +56,12 @@ export default function SettingsPage() {
 
   return (
     <div className="p-6 max-w-2xl">
-      <h1 className="text-xl font-semibold text-white mb-1">Ustawienia</h1>
+      <h1 className="text-xl font-semibold text-gray-900 mb-1">Ustawienia</h1>
       <p className="text-sm text-gray-500 mb-8">Zarządzaj swoimi portfelami inwestycyjnymi.</p>
 
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium text-gray-300 uppercase tracking-wide">Portfele</h2>
+          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Portfele</h2>
           <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
             + Nowy portfel
           </button>
@@ -69,13 +69,13 @@ export default function SettingsPage() {
 
         <div className="space-y-2">
           {portfolios.length === 0 && (
-            <p className="text-sm text-gray-600 py-4">Brak portfeli. Utwórz pierwszy portfel.</p>
+            <p className="text-sm text-gray-400 py-4">Brak portfeli. Utwórz pierwszy portfel.</p>
           )}
 
           {portfolios.map((p) => (
             <div
               key={p.id}
-              className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-xl px-4 py-3"
+              className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm"
             >
               {editId === p.id ? (
                 <div className="flex items-center gap-2 flex-1 mr-4">
@@ -96,65 +96,9 @@ export default function SettingsPage() {
                   onClick={() => handleGoToPortfolio(p.id)}
                   className="flex-1 text-left group"
                 >
-                  <p className="text-white text-sm font-medium group-hover:text-brand-500 transition-colors">
+                  <p className="text-gray-900 text-sm font-medium group-hover:text-brand-600 transition-colors">
                     {p.name}
-                    <span className="ml-2 text-xs text-gray-600 group-hover:text-gray-400">→</span>
+                    <span className="ml-2 text-xs text-gray-400 group-hover:text-gray-500">→</span>
                   </p>
-                  <p className="text-xs text-gray-500">
-                    {p.currency} · utworzony {new Date(p.created_at).toLocaleDateString('pl-PL')}
-                  </p>
-                </button>
-              )}
-
-              <div className="flex items-center gap-2 ml-4">
-                {editId === p.id ? (
-                  <>
-                    <button
-                      onClick={() => handleRename(p.id)}
-                      disabled={saving}
-                      className="btn-primary text-xs px-3 py-1"
-                    >
-                      {saving ? '...' : 'Zapisz'}
-                    </button>
-                    <button
-                      onClick={() => setEditId(null)}
-                      className="btn-ghost text-xs px-3 py-1"
-                    >
-                      Anuluj
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => { setEditId(p.id); setEditName(p.name); setError('') }}
-                      className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800"
-                    >
-                      Zmień nazwę
-                    </button>
-                    <button
-                      onClick={() => setConfirmDelete({ id: p.id, name: p.name })}
-                      disabled={deleting === p.id}
-                      className="text-xs text-gray-600 hover:text-loss transition-colors px-2 py-1 rounded hover:bg-gray-800"
-                    >
-                      {deleting === p.id ? '...' : 'Usuń'}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {showCreate && <CreatePortfolioModal onClose={() => setShowCreate(false)} />}
-
-      {confirmDelete && (
-        <ConfirmModal
-          message={`Usunąć portfel "${confirmDelete.name}"? Wszystkie pozycje i transakcje zostaną trwale usunięte.`}
-          onConfirm={() => handleDelete(confirmDelete.id)}
-          onClose={() => setConfirmDelete(null)}
-        />
-      )}
-    </div>
-  )
-}
+                  <p className="text-xs text-gray-400">
+                    {p.currency} · utworzony {new Date(p.created_at).toLocale
