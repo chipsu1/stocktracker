@@ -7,7 +7,6 @@ function formatPLN(v) {
 }
 
 export default function AllocationChart({ positions }) {
-  // Grupuj po asset_class
   const grouped = {}
   for (const p of positions) {
     const key = p.asset_class || 'Inne'
@@ -23,7 +22,7 @@ export default function AllocationChart({ positions }) {
 
   return (
     <div className="card">
-      <p className="text-sm font-medium text-gray-300 mb-4">Alokacja aktywów</p>
+      <p className="text-sm font-medium text-gray-700 mb-4">Alokacja aktywów</p>
       <ResponsiveContainer width="100%" height={240}>
         <PieChart>
           <Pie
@@ -41,12 +40,12 @@ export default function AllocationChart({ positions }) {
           </Pie>
           <Tooltip
             formatter={(v) => [formatPLN(v), 'Wartość']}
-            contentStyle={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 8 }}
-            labelStyle={{ color: '#9ca3af' }}
-            itemStyle={{ color: '#f3f4f6' }}
+            contentStyle={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8 }}
+            labelStyle={{ color: '#6b7280' }}
+            itemStyle={{ color: '#111827' }}
           />
           <Legend
-            formatter={(v) => <span style={{ color: '#9ca3af', fontSize: 12 }}>{v}</span>}
+            formatter={(v) => <span style={{ color: '#6b7280', fontSize: 12 }}>{v}</span>}
           />
         </PieChart>
       </ResponsiveContainer>
