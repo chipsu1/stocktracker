@@ -9,7 +9,7 @@ export default function StatCard({ label, value, sub, positive, negative }) {
           'text-2xl font-semibold',
           positive && 'text-gain',
           negative && 'text-loss',
-          !positive && !negative && 'text-white'
+          !positive && !negative && 'text-gray-900'
         )}
       >
         {value ?? '—'}
