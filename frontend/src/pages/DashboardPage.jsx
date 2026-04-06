@@ -1,8 +1,6 @@
 import { usePortfolioStore } from '../store/portfolioStore'
 import StatCard from '../components/ui/StatCard'
 import AllocationChart from '../components/charts/AllocationChart'
-import { useState } from 'react'
-import AddPositionModal from '../components/ui/AddPositionModal'
 
 function fmt(v) {
   if (v == null) return '—'
@@ -16,7 +14,6 @@ function fmtPct(v) {
 
 export default function DashboardPage() {
   const { summary, loading, activePortfolioId, portfolios } = usePortfolioStore()
-  const [showAdd, setShowAdd] = useState(false)
 
   const portfolio = portfolios.find((p) => p.id === activePortfolioId)
 
@@ -33,20 +30,13 @@ export default function DashboardPage() {
   }
 
   const s = summary
-  const gainPositive = s && s.total_gain_loss_pln >= 0
-  const dailyPositive = s && s.daily_change_pln >= 0
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-white">{portfolio?.name}</h1>
-          <p className="text-sm text-gray-500">{portfolio?.description || 'Podsumowanie portfela'}</p>
-        </div>
-        <button onClick={() => setShowAdd(true)} className="btn-primary text-sm">
-          + Dodaj pozycję
-        </button>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-white">{portfolio?.name}</h1>
+        <p className="text-sm text-gray-500">{portfolio?.description || 'Podsumowanie portfela'}</p>
       </div>
 
       {/* Stat cards */}
@@ -103,13 +93,11 @@ export default function DashboardPage() {
                 )
               })}
             {(!s?.positions?.length) && (
-              <p className="text-sm text-gray-600">Brak pozycji. Dodaj pierwszą.</p>
+              <p className="text-sm text-gray-600">Brak pozycji. Dodaj transakcję w zakładce Pozycje.</p>
             )}
           </div>
         </div>
       </div>
-
-      {showAdd && <AddPositionModal onClose={() => setShowAdd(false)} />}
     </div>
   )
 }
