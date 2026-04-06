@@ -19,14 +19,14 @@ export default function DashboardPage() {
 
   if (!activePortfolioId) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-500">
+      <div className="flex items-center justify-center h-full text-gray-400">
         Wybierz lub utwórz portfel w panelu bocznym.
       </div>
     )
   }
 
   if (loading && !summary) {
-    return <div className="p-8 text-gray-500 text-sm">Ładowanie...</div>
+    return <div className="p-8 text-gray-400 text-sm">Ładowanie...</div>
   }
 
   const s = summary
@@ -35,7 +35,7 @@ export default function DashboardPage() {
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-white">{portfolio?.name}</h1>
+        <h1 className="text-xl font-semibold text-gray-900">{portfolio?.name}</h1>
         <p className="text-sm text-gray-500">{portfolio?.description || 'Podsumowanie portfela'}</p>
       </div>
 
@@ -64,7 +64,7 @@ export default function DashboardPage() {
 
         {/* Top positions */}
         <div className="card">
-          <p className="text-sm font-medium text-gray-300 mb-4">Największe pozycje</p>
+          <p className="text-sm font-medium text-gray-700 mb-4">Największe pozycje</p>
           <div className="space-y-3">
             {(s?.positions || [])
               .filter((p) => p.current_value_pln)
@@ -78,22 +78,22 @@ export default function DashboardPage() {
                   <div key={p.id} className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="text-white font-medium truncate">{p.ticker}</span>
-                        <span className="text-gray-400 ml-2">{pct.toFixed(1)}%</span>
+                        <span className="text-gray-900 font-medium truncate">{p.ticker}</span>
+                        <span className="text-gray-500 ml-2">{pct.toFixed(1)}%</span>
                       </div>
-                      <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-brand-500 rounded-full"
                           style={{ width: `${Math.min(pct, 100)}%` }}
                         />
                       </div>
                     </div>
-                    <span className="text-sm text-gray-300 w-24 text-right">{fmt(p.current_value_pln)}</span>
+                    <span className="text-sm text-gray-700 w-24 text-right">{fmt(p.current_value_pln)}</span>
                   </div>
                 )
               })}
             {(!s?.positions?.length) && (
-              <p className="text-sm text-gray-600">Brak pozycji. Dodaj transakcję w zakładce Pozycje.</p>
+              <p className="text-sm text-gray-400">Brak pozycji. Dodaj transakcję w zakładce Pozycje.</p>
             )}
           </div>
         </div>
