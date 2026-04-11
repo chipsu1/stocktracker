@@ -1,5 +1,3 @@
-# backend/app/api/routes/import_gsheet.py
-
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 import pandas as pd
@@ -14,7 +12,6 @@ from app.services.portfolio_service import get_portfolio
 
 router = APIRouter(prefix="/import", tags=["import"])
 
-# Mapowanie polskich nazw z arkusza na wartości modelu
 TRANSACTION_TYPE_MAP = {
     "zakup":            "buy",
     "sprzedaż":         "sell",
@@ -34,8 +31,6 @@ REQUIRED_COLUMNS = {"Data", "Rodzaj transakcji"}
 
 
 def _parse_transaction_type(val: str) -> str:
-    if not val:
-        return None
     return TRANSACTION_TYPE_MAP.get(str(val).strip().lower())
 
 
@@ -62,12 +57,6 @@ def import_gsheet(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Importuje transakcje z pliku CSV lub XLSX wyeksportowanego z Google Sheets.
-    Obsługiwane kolumny: Konto, Data, Ticker, Waluta, Nazwa, Klasa aktywów,
-    Rodzaj transakcji, Liczba, Cena, Prowizje, Kurs PLN transakcji,
-    Cena nominalna, Total PLN, Klucz, XIRR
-    """
     get_portfolio(db, portfolio_id, current_user.id)
 
     filename = file.filename.lower()
@@ -76,7 +65,7 @@ def import_gsheet(
     try:
         if filename.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(content))
-        elif filename.endswith(".xlsx") or filename.endswith(".xls"):
+        elif filename.endswith((".xlsx", ".xls")):
             df = pd.read_excel(io.BytesIO(content))
         else:
             raise HTTPException(400, "Plik musi być w formacie .csv lub .xlsx")
@@ -85,12 +74,12 @@ def import_gsheet(
     except Exception:
         raise HTTPException(400, "Nie udało się odczytać pliku")
 
-    # Walidacja wymaganych kolumn
     missing = REQUIRED_COLUMNS - set(df.columns)
     if missing:
         raise HTTPException(400, f"Brakujące kolumny: {', '.join(missing)}")
 
-    imported = {"buy": 0, "sell": 0, "dividend": 0, "deposit": 0, "withdrawal": 0, "split": 0, "skipped": 0}
+    imported = {"buy": 0, "sell": 0, "dividend": 0, "deposit": 0,
+                "withdrawal": 0, "split": 0, "skipped": 0}
 
     for _, row in df.iterrows():
         tx_type = _parse_transaction_type(str(row.get("Rodzaj transakcji", "")))
@@ -98,7 +87,6 @@ def import_gsheet(
             imported["skipped"] += 1
             continue
 
-        date = _to_dt(row.get("Data"))
         ticker = str(row.get("Ticker", "") or "").strip().upper() or None
         asset_class = str(row.get("Klasa aktywów", "Akcje") or "Akcje").strip()
         currency = str(row.get("Waluta", "PLN") or "PLN").strip()
@@ -107,9 +95,8 @@ def import_gsheet(
         exchange_rate = _safe_float(row.get("Kurs PLN transakcji"), default=1.0)
         amount_pln = _safe_float(row.get("Total PLN"))
         nazwa = str(row.get("Nazwa", "") or "").strip()
-        notes = f"Import GSheet{' - ' + nazwa if nazwa else ''}"
 
-        tx = Transaction(
+        db.add(Transaction(
             portfolio_id=portfolio_id,
             transaction_type=tx_type,
             ticker=ticker,
@@ -120,16 +107,14 @@ def import_gsheet(
             price_pln=price * exchange_rate if price and exchange_rate else None,
             exchange_rate=exchange_rate,
             amount_pln=amount_pln,
-            date=date,
-            notes=notes,
-        )
-        db.add(tx)
+            date=_to_dt(row.get("Data")),
+            notes=f"Import GSheet{' - ' + nazwa if nazwa else ''}",
+        ))
         imported[tx_type] = imported.get(tx_type, 0) + 1
 
     db.commit()
 
-    total = sum(v for k, v in imported.items() if k != "skipped")
     return {
         "imported": imported,
-        "total_imported": total,
+        "total_imported": sum(v for k, v in imported.items() if k != "skipped"),
     }
