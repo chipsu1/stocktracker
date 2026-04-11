@@ -66,7 +66,7 @@ def import_gsheet(
         if filename.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(content))
         elif filename.endswith((".xlsx", ".xls")):
-            df = pd.read_excel(io.BytesIO(content))
+            df = pd.read_excel(io.BytesIO(content), sheet_name='Transakcje')
         else:
             raise HTTPException(400, "Plik musi być w formacie .csv lub .xlsx")
     except HTTPException:
