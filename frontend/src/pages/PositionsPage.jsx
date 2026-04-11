@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { usePortfolioStore } from '../store/portfolioStore'
 import AddTransactionModal from '../components/ui/AddTransactionModal'
 import ImportXTBModal from '../components/ui/ImportXTBModal'
@@ -65,6 +65,12 @@ export default function PositionsPage() {
   const [confirmTx, setConfirmTx] = useState(null)
   const [deletingTx, setDeletingTx] = useState(null)
 
+  // GSheet import
+  const gsheetInputRef = useRef()
+  const [importingGSheet, setImportingGSheet] = useState(false)
+  const [gsheetResult, setGSheetResult] = useState(null)
+  const [gsheetError, setGSheetError] = useState('')
+
   const portfolio = portfolios.find((p) => p.id === activePortfolioId)
   const positions = summary?.positions || []
 
@@ -118,6 +124,35 @@ export default function PositionsPage() {
     setShowAdd(true)
   }
 
+  async function handleGSheetFile(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setImportingGSheet(true)
+    setGSheetError('')
+    setGSheetResult(null)
+    try {
+      const token = localStorage.getItem('token')
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`/api/import/${activePortfolioId}/gsheet`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Błąd importu')
+      setGSheetResult(data)
+      setTxLoaded(false)
+      setTxByTicker({})
+      await fetchSummary(activePortfolioId)
+    } catch (err) {
+      setGSheetError(err.message)
+    } finally {
+      setImportingGSheet(false)
+      e.target.value = ''
+    }
+  }
+
   if (!activePortfolioId) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400">
@@ -132,6 +167,13 @@ export default function PositionsPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">{portfolio?.name} — Pozycje</h1>
           <p className="text-sm text-gray-500">{positions.length} pozycji</p>
+          {gsheetResult && (
+            <p className="text-xs text-green-600 mt-1">
+              Zaimportowano {gsheetResult.total_imported} transakcji
+              {gsheetResult.imported.skipped > 0 && ` (pominięto: ${gsheetResult.imported.skipped})`}
+            </p>
+          )}
+          {gsheetError && <p className="text-xs text-red-500 mt-1">{gsheetError}</p>}
         </div>
         <div className="flex gap-2">
           <button onClick={handleRefresh} className="btn-ghost text-sm" disabled={loading}>
@@ -140,6 +182,22 @@ export default function PositionsPage() {
           <button onClick={() => setShowImport(true)} className="btn-ghost text-sm">
             ↑ Importuj XTB
           </button>
+          {/* --- NOWY PRZYCISK --- */}
+          <input
+            ref={gsheetInputRef}
+            type="file"
+            accept=".csv,.xlsx"
+            className="hidden"
+            onChange={handleGSheetFile}
+          />
+          <button
+            onClick={() => gsheetInputRef.current.click()}
+            className="btn-ghost text-sm"
+            disabled={importingGSheet}
+          >
+            {importingGSheet ? 'Importowanie...' : '↑ Importuj arkusz'}
+          </button>
+          {/* ------------------- */}
           <button onClick={() => { setDefaultTicker(''); setShowAdd(true) }} className="btn-primary text-sm">
             + Dodaj transakcję
           </button>
