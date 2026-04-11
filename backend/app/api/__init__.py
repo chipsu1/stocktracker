@@ -1,3 +1,4 @@
+# backend/app/api/__init__.py
 from fastapi import APIRouter
 from app.api.routes import auth, portfolios, prices, import_xtb, import_gsheet
 
