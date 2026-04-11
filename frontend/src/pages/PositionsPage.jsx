@@ -6,6 +6,8 @@ import ConfirmModal from '../components/ui/ConfirmModal'
 import clsx from 'clsx'
 import { portfolioService } from '../services/portfolio'
 
+const BACKEND_URL = 'https://stocktracker-production-5f5f.up.railway.app'
+
 function fmt(v, decimals = 2) {
   if (v == null) return '—'
   return new Intl.NumberFormat('pl-PL', {
@@ -65,7 +67,6 @@ export default function PositionsPage() {
   const [confirmTx, setConfirmTx] = useState(null)
   const [deletingTx, setDeletingTx] = useState(null)
 
-  // GSheet import
   const gsheetInputRef = useRef()
   const [importingGSheet, setImportingGSheet] = useState(false)
   const [gsheetResult, setGSheetResult] = useState(null)
@@ -134,7 +135,7 @@ export default function PositionsPage() {
       const token = localStorage.getItem('token')
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch(`/api/import/${activePortfolioId}/gsheet`, {
+      const res = await fetch(`${BACKEND_URL}/api/import/${activePortfolioId}/gsheet`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -182,7 +183,6 @@ export default function PositionsPage() {
           <button onClick={() => setShowImport(true)} className="btn-ghost text-sm">
             ↑ Importuj XTB
           </button>
-          {/* --- NOWY PRZYCISK --- */}
           <input
             ref={gsheetInputRef}
             type="file"
@@ -197,14 +197,12 @@ export default function PositionsPage() {
           >
             {importingGSheet ? 'Importowanie...' : '↑ Importuj arkusz'}
           </button>
-          {/* ------------------- */}
           <button onClick={() => { setDefaultTicker(''); setShowAdd(true) }} className="btn-primary text-sm">
             + Dodaj transakcję
           </button>
         </div>
       </div>
 
-      {/* Saldo gotówkowe */}
       {summary?.cash_pln != null && (
         <div className="mb-4 px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm flex items-center gap-3">
           <span className="text-xs text-gray-400 uppercase tracking-wide">Saldo gotówkowe</span>
@@ -240,11 +238,9 @@ export default function PositionsPage() {
                 </td>
               </tr>
             )}
-
             {positions.map((p) => {
               const isExpanded = expanded[p.ticker]
               const tickerTx = txByTicker[p.ticker] || []
-
               return (
                 <>
                   <tr
@@ -255,9 +251,7 @@ export default function PositionsPage() {
                     )}
                     onClick={() => toggleExpand(p.ticker)}
                   >
-                    <td className="px-4 py-3 text-gray-400 text-xs">
-                      {isExpanded ? '▼' : '▶'}
-                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{isExpanded ? '▼' : '▶'}</td>
                     <td className="px-4 py-3 font-mono font-medium text-gray-900">{p.ticker}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{p.asset_class}</td>
                     <td className="px-4 py-3 text-right text-gray-500">{p.currency}</td>
@@ -283,7 +277,6 @@ export default function PositionsPage() {
                       </button>
                     </td>
                   </tr>
-
                   {isExpanded && (
                     <>
                       {loadingTx && (
@@ -307,18 +300,14 @@ export default function PositionsPage() {
                               {TX_LABELS[tx.transaction_type] || tx.transaction_type}
                             </span>
                           </td>
-                          <td className="px-4 py-2 text-xs text-gray-400" colSpan={2}>
-                            {fmtDate(tx.date)}
-                          </td>
+                          <td className="px-4 py-2 text-xs text-gray-400" colSpan={2}>{fmtDate(tx.date)}</td>
                           <td className="px-4 py-2 text-right text-xs text-gray-600">
                             {tx.quantity != null ? fmtNum(tx.quantity, tx.quantity % 1 === 0 ? 0 : 4) : '—'}
                           </td>
                           <td className="px-4 py-2 text-right text-xs text-gray-600">
                             {tx.price != null ? `${fmtNum(tx.price)} ${tx.currency}` : '—'}
                           </td>
-                          <td className="px-4 py-2 text-right text-xs text-gray-400" colSpan={4}>
-                            {tx.notes || ''}
-                          </td>
+                          <td className="px-4 py-2 text-right text-xs text-gray-400" colSpan={4}>{tx.notes || ''}</td>
                           <td className="px-4 py-2 text-right" colSpan={2}>
                             <button
                               onClick={() => setConfirmTx({ id: tx.id, label: `${TX_LABELS[tx.transaction_type]} ${p.ticker}` })}
@@ -336,7 +325,6 @@ export default function PositionsPage() {
               )
             })}
           </tbody>
-
           {positions.length > 0 && summary && (
             <tfoot>
               <tr className="border-t border-gray-200 bg-gray-50">
