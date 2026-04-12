@@ -20,6 +20,11 @@ EXCHANGE_PREFIX_MAP = {
     "EPA:":    ".PA",   # Paris
     "ETR:":    ".DE",   # Frankfurt
     "LON:":    ".L",    # London
+    "BIT:":    ".MI",   # Milano (Borsa Italiana)
+    "BME:":    ".MC",   # Madrid
+    "STO:":    ".ST",   # Stockholm
+    "CPH:":    ".CO",   # Copenhagen
+    "HEL:":    ".HE",   # Helsinki
     "WSE:":    ".WA",   # Warsaw (fallback yfinance, głównie Stooq)
 }
 
