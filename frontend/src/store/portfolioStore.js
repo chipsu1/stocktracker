@@ -5,6 +5,7 @@ export const usePortfolioStore = create((set, get) => ({
   portfolios: [],
   activePortfolioId: null,
   summary: null,
+  allSummaries: [],      // ← NOWE: summary wszystkich portfeli
   loading: false,
   error: null,
 
@@ -15,7 +16,6 @@ export const usePortfolioStore = create((set, get) => ({
       set({ portfolios, loading: false })
       const currentId = get().activePortfolioId
       const stillExists = portfolios.find((p) => p.id === currentId)
-      // Jeśli aktywne portfolio nie istnieje lub nie było ustawione — ustaw pierwsze
       if (!stillExists && portfolios.length > 0) {
         set({ activePortfolioId: portfolios[0].id })
         await get().fetchSummary(portfolios[0].id)
@@ -32,6 +32,20 @@ export const usePortfolioStore = create((set, get) => ({
     try {
       const summary = await portfolioService.getSummary(portfolioId)
       set({ summary, activePortfolioId: portfolioId, loading: false })
+    } catch (e) {
+      set({ error: e.message, loading: false })
+    }
+  },
+
+  // ← NOWE: pobiera summary wszystkich portfeli równolegle
+  fetchAllSummaries: async () => {
+    set({ loading: true, error: null })
+    try {
+      const { portfolios } = get()
+      const results = await Promise.all(
+        portfolios.map((p) => portfolioService.getSummary(p.id))
+      )
+      set({ allSummaries: results, loading: false })
     } catch (e) {
       set({ error: e.message, loading: false })
     }
