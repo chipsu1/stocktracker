@@ -108,6 +108,11 @@ def _fetch_yfinance(ticker: str) -> Optional[Tuple[float, float]]:
         return None
 
 
+def _fetch_yfinance_wa(ticker: str) -> Optional[Tuple[float, float]]:
+    """Próbuje ticker z sufiksem .WA (GPW) gdy sam ticker nie zadziałał."""
+    return _fetch_yfinance(ticker + ".WA")
+
+
 def _is_gpw(ticker: str) -> bool:
     t = ticker.upper()
     return t.startswith("WSE:") or t.endswith(".PL") or t.endswith(".WA")
@@ -132,9 +137,11 @@ def get_price(ticker: str, currency: str = "PLN") -> Dict:
     if result is None:
         result = _fetch_yfinance(ticker)
 
-    # Ostatni fallback: spróbuj Stooq dla krótkich tickerów bez prefiksu (np. XTB, KRU, COG)
+    # Fallback dla krótkich tickerów bez prefiksu (np. XTB, ELT, COG, KRU) – próbuj .WA
     if result is None and ":" not in ticker and "." not in ticker and len(ticker) <= 6:
-        result = _fetch_stooq(ticker)
+        result = _fetch_stooq(ticker)          # próba Stooq (xtb.pl itp.)
+    if result is None and ":" not in ticker and "." not in ticker and len(ticker) <= 6:
+        result = _fetch_yfinance_wa(ticker)    # próba yfinance z .WA
 
     if result is None:
         return {"ticker": ticker, "price": None, "daily_change_pct": None,
