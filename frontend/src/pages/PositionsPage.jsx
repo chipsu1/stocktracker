@@ -5,6 +5,7 @@ import ImportXTBModal from '../components/ui/ImportXTBModal'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import clsx from 'clsx'
 import { portfolioService } from '../services/portfolio'
+import ImportGSheetButton from '../components/ui/ImportGSheetButton'
 
 function fmt(v, decimals = 2) {
   if (v == null) return '—'
@@ -140,6 +141,7 @@ export default function PositionsPage() {
           <button onClick={() => setShowImport(true)} className="btn-ghost text-sm">
             ↑ Importuj XTB
           </button>
+          <ImportGSheetButton />
           <button onClick={() => { setDefaultTicker(''); setShowAdd(true) }} className="btn-primary text-sm">
             + Dodaj transakcję
           </button>
