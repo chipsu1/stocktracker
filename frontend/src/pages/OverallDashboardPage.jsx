@@ -3,6 +3,7 @@ import { usePortfolioStore } from '../store/portfolioStore'
 import { useNavigate } from 'react-router-dom'
 import StatCard from '../components/ui/StatCard'
 import AllocationChart from '../components/charts/AllocationChart'
+import ImportMultiGSheetButton from '../components/ui/ImportMultiGSheetButton'
 import clsx from 'clsx'
 
 function fmt(v) {
@@ -49,9 +50,12 @@ export default function OverallDashboardPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Wszystkie portfele</h1>
-        <p className="text-sm text-gray-500">Łączne podsumowanie — {portfolios.length} portfeli</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Wszystkie portfele</h1>
+          <p className="text-sm text-gray-500">Łączne podsumowanie — {portfolios.length} portfeli</p>
+        </div>
+        <ImportMultiGSheetButton />
       </div>
 
       {/* Stat cards */}
