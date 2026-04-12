@@ -30,6 +30,7 @@ class PortfolioOut(BaseModel):
 class TransactionCreate(BaseModel):
     transaction_type: str  # buy | sell | dividend | split | deposit | withdrawal
     ticker: Optional[str] = None
+    name: Optional[str] = None             # ← NOWE: pełna nazwa spółki
     asset_class: Optional[str] = "Akcje"
     currency: Optional[str] = "PLN"
     quantity: Optional[float] = None
@@ -45,6 +46,7 @@ class TransactionOut(BaseModel):
     portfolio_id: int
     transaction_type: str
     ticker: Optional[str]
+    name: Optional[str]                    # ← NOWE
     asset_class: Optional[str]
     currency: Optional[str]
     quantity: Optional[float]
@@ -62,6 +64,7 @@ class TransactionOut(BaseModel):
 # Position (wyliczana z transakcji, nie przechowywana)
 class PositionOut(BaseModel):
     ticker: str
+    name: Optional[str] = None             # ← NOWE: pełna nazwa spółki
     asset_class: str
     currency: str
     quantity: float
@@ -88,4 +91,4 @@ class PortfolioSummary(BaseModel):
     total_gain_loss_pln: float
     total_gain_loss_pct: float
     daily_change_pln: float
-    cash_pln: float  # saldo gotówkowe (wpłaty - wypłaty - zakupy + sprzedaże + dywidendy)
+    cash_pln: float
