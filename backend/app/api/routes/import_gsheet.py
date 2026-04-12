@@ -82,7 +82,17 @@ def import_gsheet(
         if filename.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(content))
         elif filename.endswith((".xlsx", ".xls")):
-            df = pd.read_excel(io.BytesIO(content))
+            # Najpierw wczytaj bez nagłówka żeby znaleźć wiersz z kolumnami
+            raw = pd.read_excel(io.BytesIO(content), sheet_name="Transakcje", header=None)
+            header_row = None
+            for i, row in raw.iterrows():
+                vals = [str(v).strip() for v in row.values]
+                if "Data" in vals and "Rodzaj transakcji" in vals:
+                    header_row = i
+                    break
+            if header_row is None:
+                raise HTTPException(400, "Nie znaleziono wiersza nagłówkowego z kolumnami 'Data' i 'Rodzaj transakcji'")
+            df = pd.read_excel(io.BytesIO(content), sheet_name="Transakcje", header=header_row)
         else:
             raise HTTPException(400, "Plik musi być w formacie .csv lub .xlsx")
     except HTTPException:
