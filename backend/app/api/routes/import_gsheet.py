@@ -90,9 +90,12 @@ def import_gsheet(
     except Exception:
         raise HTTPException(400, "Nie udało się odczytać pliku")
 
+    # Normalizuj nagłówki – usuń BOM, whitespace
+    df.columns = [str(c).strip().lstrip("\ufeff") for c in df.columns]
+
     missing = REQUIRED_COLUMNS - set(df.columns)
     if missing:
-        raise HTTPException(400, f"Brakujące kolumny: {', '.join(missing)}")
+        raise HTTPException(400, f"Brakujące kolumny: {', '.join(missing)}. Dostępne: {', '.join(df.columns.tolist())}")
 
     imported = {"buy": 0, "sell": 0, "dividend": 0, "deposit": 0,
                 "withdrawal": 0, "split": 0, "skipped": 0}
