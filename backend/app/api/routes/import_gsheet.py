@@ -42,10 +42,26 @@ def _to_dt(val) -> datetime:
 
 
 def _safe_float(val, default=None):
+    """Parsuje float z wartości które mogą zawierać 'zł', spacje tysięcy, przecinki."""
     try:
         if pd.isna(val):
             return default
-        return float(val)
+    except Exception:
+        pass
+    try:
+        cleaned = (
+            str(val)
+            .replace("zł", "")
+            .replace("PLN", "")
+            .replace("\xa0", "")   # non-breaking space
+            .replace("\u202f", "") # narrow no-break space
+            .replace(" ", "")
+            .replace(",", ".")
+            .strip()
+        )
+        if not cleaned:
+            return default
+        return float(cleaned)
     except Exception:
         return default
 
@@ -66,7 +82,7 @@ def import_gsheet(
         if filename.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(content))
         elif filename.endswith((".xlsx", ".xls")):
-            df = pd.read_excel(io.BytesIO(content), sheet_name='Transakcje')
+            df = pd.read_excel(io.BytesIO(content))
         else:
             raise HTTPException(400, "Plik musi być w formacie .csv lub .xlsx")
     except HTTPException:
@@ -88,18 +104,33 @@ def import_gsheet(
             continue
 
         ticker = str(row.get("Ticker", "") or "").strip().upper() or None
+        nazwa = str(row.get("Nazwa", "") or "").strip() or None
         asset_class = str(row.get("Klasa aktywów", "Akcje") or "Akcje").strip()
         currency = str(row.get("Waluta", "PLN") or "PLN").strip()
         quantity = _safe_float(row.get("Liczba"))
         price = _safe_float(row.get("Cena"))
         exchange_rate = _safe_float(row.get("Kurs PLN transakcji"), default=1.0)
         amount_pln = _safe_float(row.get("Total PLN"))
-        nazwa = str(row.get("Nazwa", "") or "").strip()
+
+        # Dla deposit/withdrawal – jeśli brak Total PLN, spróbuj Cena nominalna
+        if tx_type in ("deposit", "withdrawal") and amount_pln is None:
+            amount_pln = _safe_float(row.get("Cena nominalna"))
+
+        # Pomiń wiersze deposit/withdrawal bez kwoty
+        if tx_type in ("deposit", "withdrawal") and not amount_pln:
+            imported["skipped"] += 1
+            continue
+
+        # Dla deposit/withdrawal ticker to wewnętrzna etykieta ("Gotówka") – nie przechowujemy
+        if tx_type in ("deposit", "withdrawal"):
+            ticker = None
+            nazwa = None
 
         db.add(Transaction(
             portfolio_id=portfolio_id,
             transaction_type=tx_type,
             ticker=ticker,
+            name=nazwa,                    # ← pełna nazwa spółki
             asset_class=asset_class,
             currency=currency,
             quantity=quantity,
@@ -108,7 +139,7 @@ def import_gsheet(
             exchange_rate=exchange_rate,
             amount_pln=amount_pln,
             date=_to_dt(row.get("Data")),
-            notes=f"Import GSheet{' - ' + nazwa if nazwa else ''}",
+            notes=f"Import GSheet",
         ))
         imported[tx_type] = imported.get(tx_type, 0) + 1
 
