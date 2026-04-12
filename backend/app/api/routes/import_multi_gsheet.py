@@ -180,6 +180,11 @@ def import_multi_gsheet(
         exchange_rate = _safe_float(row.get("Kurs PLN transakcji"), default=1.0)
         amount_pln = _safe_float(row.get("Total PLN")) or _safe_float(row.get("Cena nominalna"))
 
+        # Dla dywidendy – kwota całkowita to Total PLN, nie Cena jednostkowa
+        if tx_type == "dividend":
+            price = amount_pln or price
+            # amount_pln już jest ustawione z Total PLN
+
         # Deposit/withdrawal – wyczyść ticker
         if tx_type in ("deposit", "withdrawal"):
             if not amount_pln:
