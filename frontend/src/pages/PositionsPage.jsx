@@ -163,8 +163,8 @@ export default function PositionsPage() {
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
               <th className="text-left px-4 py-3 font-medium w-6"></th>
-              <th className="text-left px-4 py-3 font-medium">Ticker</th>
               <th className="text-left px-4 py-3 font-medium">Nazwa</th>
+              <th className="text-left px-4 py-3 font-medium">Ticker</th>
               <th className="text-right px-4 py-3 font-medium">Waluta</th>
               <th className="text-right px-4 py-3 font-medium">Liczba</th>
               <th className="text-right px-4 py-3 font-medium">Śr. cena zakupu</th>
@@ -202,11 +202,11 @@ export default function PositionsPage() {
                     <td className="px-4 py-3 text-gray-400 text-xs">
                       {isExpanded ? '▼' : '▶'}
                     </td>
-                    <td className="px-4 py-3 font-mono font-medium text-gray-900">{p.ticker}</td>
                     <td className="px-4 py-3 text-gray-700 text-xs">
-                      {/* ← ZMIANA: pokazuj nazwę spółki, fallback na asset_class */}
+                      {/* nazwa spółki, fallback na asset_class */}
                       {p.name || <span className="text-gray-400">{p.asset_class}</span>}
                     </td>
+                    <td className="px-4 py-3 font-mono font-medium text-gray-900">{p.ticker}</td>
                     <td className="px-4 py-3 text-right text-gray-500">{p.currency}</td>
                     <td className="px-4 py-3 text-right text-gray-700">
                       {fmtNum(p.quantity, p.quantity % 1 === 0 ? 0 : 4)}
