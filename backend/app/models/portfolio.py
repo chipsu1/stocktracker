@@ -37,6 +37,7 @@ class Transaction(Base):
 
     # Dla buy/sell/dividend/split
     ticker = Column(String, nullable=True)
+    name = Column(String, nullable=True)           # ← NOWE: pełna nazwa spółki
     asset_class = Column(String, nullable=True, default="Akcje")
     currency = Column(String, nullable=True, default="PLN")
     quantity = Column(Float, nullable=True)
