@@ -213,7 +213,7 @@ def _compute_cash(transactions: List[Transaction]) -> float:
         elif tx.transaction_type == "sell":
             cash += tx.quantity * (tx.price_pln or tx.price or 0)
         elif tx.transaction_type == "dividend":
-            cash += tx.price_pln or tx.price or 0
+            cash += tx.amount_pln or tx.price_pln or tx.price or 0
     return cash
 
 
