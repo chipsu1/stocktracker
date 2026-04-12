@@ -1,15 +1,19 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Dict
+from typing import List, Dict, Optional
 import pandas as pd
 import io
 from datetime import datetime
+import yfinance as yf
+import logging
 
 from app.db.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.models.portfolio import Transaction
 from app.services.portfolio_service import get_portfolio
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -35,6 +39,28 @@ def _to_dt(val) -> datetime:
         return pd.Timestamp(val).to_pydatetime()
     except Exception:
         return datetime.utcnow()
+
+
+def _fetch_company_name(ticker: str) -> Optional[str]:
+    """Pobiera nazwę spółki z yfinance. Zwraca None jeśli nie uda się pobrać."""
+    try:
+        info = yf.Ticker(ticker).info
+        return (
+            info.get("longName")
+            or info.get("shortName")
+            or None
+        )
+    except Exception as e:
+        logger.warning(f"Nie udało się pobrać nazwy dla {ticker}: {e}")
+        return None
+
+
+def _fetch_names_batch(tickers: List[str]) -> Dict[str, Optional[str]]:
+    """Pobiera nazwy dla listy tickerów. Nieznane → None."""
+    names = {}
+    for ticker in tickers:
+        names[ticker] = _fetch_company_name(ticker)
+    return names
 
 
 def _get_cash_balance(xl: pd.ExcelFile) -> float:
@@ -102,12 +128,6 @@ def import_xtb(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Importuje dane z pliku XTB (.xlsx):
-    1. Otwarte pozycje → transakcje BUY
-    2. Jedna wpłata startowa = wartość pozycji + balans gotówki
-       (zawiera całą historię: wpłaty, sprzedaże, dywidendy, odsetki)
-    """
     get_portfolio(db, portfolio_id, current_user.id)
 
     if not file.filename.endswith(".xlsx"):
@@ -121,19 +141,16 @@ def import_xtb(
 
     open_positions = _parse_open_positions(xl)
 
-    # Łączna wartość otwartych pozycji
+    # Dociągnij nazwy spółek z yfinance dla wszystkich unikalnych tickerów
+    unique_tickers = list({p["ticker"] for p in open_positions})
+    company_names = _fetch_names_batch(unique_tickers)
+
     total_positions_value = sum(p["purchase_value"] for p in open_positions)
-
-    # Aktualny balans gotówki z nagłówka pliku
     cash_balance = _get_cash_balance(xl)
-
-    # Wpłata startowa = wartość pozycji + balans gotówki
-    # Skąd: saldo = wpłaty - zakupy → wpłaty = zakupy + saldo
     deposit_amount = total_positions_value + cash_balance
 
     imported = {"buy": 0, "deposit": 0}
 
-    # Jedna wpłata startowa
     if deposit_amount > 0:
         db.add(Transaction(
             portfolio_id=portfolio_id,
@@ -144,12 +161,13 @@ def import_xtb(
         ))
         imported["deposit"] += 1
 
-    # Otwarte pozycje jako zakupy
     for pos in open_positions:
+        ticker = pos["ticker"]
         tx = Transaction(
             portfolio_id=portfolio_id,
             transaction_type="buy",
-            ticker=pos["ticker"],
+            ticker=ticker,
+            name=company_names.get(ticker),   # ← nazwa z yfinance
             asset_class=pos.get("asset_class", "Akcje"),
             currency=pos.get("currency", "PLN"),
             quantity=pos["quantity"],
@@ -169,4 +187,5 @@ def import_xtb(
         "total_imported": sum(imported.values()),
         "cash_balance": cash_balance,
         "deposit_amount": round(deposit_amount, 2),
+        "names_fetched": {k: v for k, v in company_names.items() if v},
     }
