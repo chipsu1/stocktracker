@@ -132,6 +132,10 @@ def get_price(ticker: str, currency: str = "PLN") -> Dict:
     if result is None:
         result = _fetch_yfinance(ticker)
 
+    # Ostatni fallback: spróbuj Stooq dla krótkich tickerów bez prefiksu (np. XTB, KRU, COG)
+    if result is None and ":" not in ticker and "." not in ticker and len(ticker) <= 6:
+        result = _fetch_stooq(ticker)
+
     if result is None:
         return {"ticker": ticker, "price": None, "daily_change_pct": None,
                 "currency": currency, "fx_rate": get_fx_rate_pln(currency), "price_pln": None,
