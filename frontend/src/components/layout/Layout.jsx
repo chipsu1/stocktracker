@@ -4,9 +4,10 @@ import { useAuthStore } from '../../store/authStore'
 import { usePortfolioStore } from '../../store/portfolioStore'
 import CreatePortfolioModal from '../ui/CreatePortfolioModal'
 import clsx from 'clsx'
-import { LayoutDashboard, ListOrdered, Settings, LogOut, TrendingUp } from 'lucide-react'
+import { LayoutDashboard, ListOrdered, Settings, LogOut, TrendingUp, Globe } from 'lucide-react'
 
 const NAV = [
+  { to: '/dashboard/overall', label: 'Przegląd ogólny', icon: Globe },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/positions', label: 'Pozycje', icon: ListOrdered },
   { to: '/settings', label: 'Ustawienia', icon: Settings },
@@ -62,6 +63,7 @@ export default function Layout() {
             <NavLink
               key={to}
               to={to}
+              end={to === '/dashboard'}
               className={({ isActive }) =>
                 clsx(
                   'flex items-center gap-2.5 text-sm px-3 py-2 rounded-lg transition-colors',
