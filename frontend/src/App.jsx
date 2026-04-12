@@ -4,8 +4,8 @@ import Layout from './components/layout/Layout'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
+import OverallDashboardPage from './pages/OverallDashboardPage'
 import PositionsPage from './pages/PositionsPage'
-import SettingsPage from './pages/SettingsPage'
 
 function PrivateRoute({ children }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -26,10 +26,10 @@ export default function App() {
             </PrivateRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<Navigate to="/dashboard/overall" replace />} />
+          <Route path="dashboard/overall" element={<OverallDashboardPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="positions" element={<PositionsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
