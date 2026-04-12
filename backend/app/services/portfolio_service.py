@@ -97,6 +97,7 @@ def add_transaction(db: Session, portfolio_id: int, user_id: int, data: Transact
         portfolio_id=portfolio_id,
         transaction_type=data.transaction_type,
         ticker=data.ticker.upper().strip() if data.ticker else None,
+        name=data.name.strip() if data.name else None,   # ← NOWE
         asset_class=data.asset_class,
         currency=data.currency,
         quantity=data.quantity,
@@ -141,7 +142,7 @@ def delete_transaction(db: Session, transaction_id: int, user_id: int):
 def _compute_positions(transactions: List[Transaction]) -> Dict[str, dict]:
     """
     Wylicza aktualne pozycje na podstawie listy transakcji.
-    Zwraca dict: { ticker -> { quantity, avg_price, avg_price_pln, cost_pln, asset_class, currency, first_date } }
+    Zwraca dict: { ticker -> { quantity, avg_price, avg_price_pln, cost_pln, asset_class, currency, name, first_date } }
     """
     positions = {}
 
@@ -153,6 +154,7 @@ def _compute_positions(transactions: List[Transaction]) -> Dict[str, dict]:
         if ticker not in positions:
             positions[ticker] = {
                 "ticker": ticker,
+                "name": tx.name or None,           # ← NOWE: nazwa z pierwszej transakcji
                 "asset_class": tx.asset_class or "Akcje",
                 "currency": tx.currency or "PLN",
                 "quantity": 0.0,
@@ -163,6 +165,10 @@ def _compute_positions(transactions: List[Transaction]) -> Dict[str, dict]:
             }
 
         pos = positions[ticker]
+
+        # Jeśli kolejna transakcja ma nazwę a poprzednia nie miała – uzupełnij
+        if not pos["name"] and tx.name:
+            pos["name"] = tx.name
 
         if tx.transaction_type == "buy":
             new_qty = pos["quantity"] + tx.quantity
@@ -177,7 +183,6 @@ def _compute_positions(transactions: List[Transaction]) -> Dict[str, dict]:
         elif tx.transaction_type == "sell":
             sold_qty = min(tx.quantity, pos["quantity"])
             if pos["quantity"] > 0:
-                # Proporcjonalnie zmniejsz koszt
                 ratio = sold_qty / pos["quantity"]
                 pos["total_cost_pln"] -= pos["total_cost_pln"] * ratio
             pos["quantity"] = max(0.0, pos["quantity"] - sold_qty)
@@ -185,14 +190,11 @@ def _compute_positions(transactions: List[Transaction]) -> Dict[str, dict]:
                 pos["total_cost_pln"] = 0.0
 
         elif tx.transaction_type == "split":
-            # quantity = nowa liczba akcji / stara liczba akcji (współczynnik)
             if pos["quantity"] > 0 and tx.quantity:
                 new_qty = pos["quantity"] * tx.quantity
-                # Avg price spada proporcjonalnie
                 pos["avg_purchase_price"] = pos["avg_purchase_price"] / tx.quantity
                 pos["avg_purchase_price_pln"] = pos["avg_purchase_price_pln"] / tx.quantity
                 pos["quantity"] = new_qty
-                # total_cost_pln się nie zmienia
 
     # Usuń pozycje z zerową ilością
     return {k: v for k, v in positions.items() if v["quantity"] > 0.001}
@@ -284,6 +286,7 @@ def get_portfolio_summary(db: Session, portfolio_id: int, user_id: int) -> Portf
 
         enriched.append(PositionOut(
             ticker=ticker,
+            name=pos.get("name"),              # ← NOWE
             asset_class=pos["asset_class"],
             currency=pos["currency"],
             quantity=pos["quantity"],
